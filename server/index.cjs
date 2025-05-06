@@ -95,14 +95,44 @@ app.delete('/api/connections/:id', (req, res) => {
 io.on('connection', (socket) => {
   console.log('New client connected');
   
+  // Handle user registration
+  socket.on('register-user', (userData) => {
+    // Generate a unique ID if not provided
+    const userId = userData.id || `user-${Date.now()}`;
+    
+    // Create or update user
+    const existingUserIndex = users.findIndex(u => u.id === userId);
+    const user = {
+      id: userId,
+      name: userData.name || `User-${users.length + 1}`,
+      status: 'online'
+    };
+    
+    if (existingUserIndex !== -1) {
+      // Update existing user
+      users[existingUserIndex] = user;
+    } else {
+      // Add new user
+      users.push(user);
+    }
+    
+    // Acknowledge registration with user data
+    socket.emit('user-registered', user);
+    
+    // Notify all clients about updated user list
+    io.emit('user-update', users);
+  });
+  
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    // If we stored the user ID on the socket, we could mark them as offline here
+    console.log('Client disconnected');
+  });
+  
   // Send current data to newly connected client
   socket.emit('device-update', devices);
   socket.emit('user-update', users);
   socket.emit('connection-update', connections);
-  
-  socket.on('disconnect', () => {
-    console.log('Client disconnected');
-  });
 });
 
 // Utility functions

@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
-import { ChevronRight, ChevronDown, Laptop, Router, Smartphone, Network, User } from 'lucide-react';
-import { useNetwork } from '../context/NetworkContext';
+import React, { useState } from "react";
+import {
+  ChevronRight,
+  ChevronDown,
+  Laptop,
+  Router,
+  Smartphone,
+  Network,
+  User,
+} from "lucide-react";
+import { useNetwork } from "../context/NetworkContext";
 
 interface DeviceListProps {
   onConnect: () => void;
@@ -16,11 +24,11 @@ const DeviceList: React.FC<DeviceListProps> = ({ onConnect }) => {
 
   const getDeviceIcon = (type: string) => {
     switch (type) {
-      case 'computer':
+      case "computer":
         return <Laptop className="h-5 w-5 text-blue-500" />;
-      case 'router':
+      case "router":
         return <Router className="h-5 w-5 text-red-500" />;
-      case 'smartphone':
+      case "smartphone":
         return <Smartphone className="h-5 w-5 text-green-500" />;
       default:
         return <Network className="h-5 w-5 text-purple-500" />;
@@ -28,18 +36,20 @@ const DeviceList: React.FC<DeviceListProps> = ({ onConnect }) => {
   };
 
   return (
-    <aside className={`
+    <aside
+      className={`
       bg-gray-100 dark:bg-gray-800 p-4 transition-all duration-300
-      ${isExpanded ? 'w-full md:w-80' : 'w-16'}
-    `}>
+      ${isExpanded ? "w-full md:w-80" : "w-16"}
+    `}
+    >
       <div className="flex items-center justify-between mb-4">
-        <h2 className={`font-semibold ${isExpanded ? 'block' : 'hidden'}`}>
+        <h2 className={`font-semibold ${isExpanded ? "block" : "hidden"}`}>
           Network Devices
         </h2>
-        <button 
+        <button
           onClick={toggleExpand}
           className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-          aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+          aria-label={isExpanded ? "Collapse sidebar" : "Expand sidebar"}
         >
           {isExpanded ? (
             <ChevronLeft className="h-5 w-5" />
@@ -58,9 +68,9 @@ const DeviceList: React.FC<DeviceListProps> = ({ onConnect }) => {
               </h3>
             </div>
             <div className="space-y-2 max-h-48 overflow-y-auto">
-              {users.map(user => (
-                <div 
-                  key={user.id} 
+              {users.map((user) => (
+                <div
+                  key={user.id}
                   className="device-item flex items-center justify-between"
                   onClick={onConnect}
                 >
@@ -76,20 +86,32 @@ const DeviceList: React.FC<DeviceListProps> = ({ onConnect }) => {
                     </div>
                   </div>
                   <div className="flex space-x-1">
-                    {connections.some(c => 
-                      (c.sourceId === user.id || c.targetId === user.id) && c.type === 'P2P'
+                    {connections.some(
+                      (c) =>
+                        (c.sourceId === user.id || c.targetId === user.id) &&
+                        c.type === "P2P"
                     ) && (
-                      <span className="connection-p2p text-xs px-1 rounded">P2P</span>
+                      <span className="connection-p2p text-xs px-1 rounded">
+                        P2P
+                      </span>
                     )}
-                    {connections.some(c => 
-                      (c.sourceId === user.id || c.targetId === user.id) && c.type === 'LAN'
+                    {connections.some(
+                      (c) =>
+                        (c.sourceId === user.id || c.targetId === user.id) &&
+                        c.type === "LAN"
                     ) && (
-                      <span className="connection-lan text-xs px-1 rounded">LAN</span>
+                      <span className="connection-lan text-xs px-1 rounded">
+                        LAN
+                      </span>
                     )}
-                    {connections.some(c => 
-                      (c.sourceId === user.id || c.targetId === user.id) && c.type === 'WLAN'
+                    {connections.some(
+                      (c) =>
+                        (c.sourceId === user.id || c.targetId === user.id) &&
+                        c.type === "WAN"
                     ) && (
-                      <span className="connection-wlan text-xs px-1 rounded">WLAN</span>
+                      <span className="connection-wan text-xs px-1 rounded">
+                        WAN
+                      </span>
                     )}
                   </div>
                 </div>
@@ -104,9 +126,9 @@ const DeviceList: React.FC<DeviceListProps> = ({ onConnect }) => {
               </h3>
             </div>
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {devices.map(device => (
-                <div 
-                  key={device.id} 
+              {devices.map((device) => (
+                <div
+                  key={device.id}
                   className="device-item flex items-center justify-between"
                 >
                   <div className="flex items-center">
@@ -135,14 +157,14 @@ const DeviceList: React.FC<DeviceListProps> = ({ onConnect }) => {
 
 // ChevronLeft component for sidebar toggle
 const ChevronLeft: React.FC<{ className?: string }> = ({ className }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    className={className} 
-    viewBox="0 0 24 24" 
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    viewBox="0 0 24 24"
     fill="none"
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
     strokeLinejoin="round"
   >
     <polyline points="15 18 9 12 15 6"></polyline>
