@@ -141,15 +141,15 @@ function parseArpOutput(output) {
       const ip = match[1];
       const mac = match[2];
       
-      // Try to determine device type based on MAC prefix
-      // This is a simplified approach
-      let type = 'other';
-      if (mac.toLowerCase().startsWith('00:1a:2b')) {
+      // Try to determine device type based on MAC prefix or IP pattern
+      let type = 'computer';
+      
+      // Simple heuristic for device type (can be improved)
+      if (ip.startsWith('192.168.1.1') || ip.startsWith('10.0.0.1')) {
         type = 'router';
-      } else if (mac.toLowerCase().startsWith('ac:de')) {
+      } else if (mac.toLowerCase().startsWith('a8:') || 
+                mac.toLowerCase().startsWith('ac:')) {
         type = 'smartphone';
-      } else {
-        type = 'computer';
       }
       
       devices.push({
