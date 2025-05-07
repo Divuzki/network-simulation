@@ -24,6 +24,20 @@ const io = new Server(server, {
 const devices = [];
 const users = [];
 const connections = [];
+const socketUserMap = new Map(); // Map socket.id to userId
+
+// --- Network metrics mock function ---
+function getMockNetworkMetrics(userId) {
+  // In a real implementation, gather real metrics here
+  // For demo, return random values
+  return {
+    uploadSpeed: (Math.random() * 100 + 10).toFixed(2), // Mbps
+    downloadSpeed: (Math.random() * 100 + 10).toFixed(2), // Mbps
+    packetLoss: (Math.random() * 5).toFixed(2), // %
+    throughput: (Math.random() * 100 + 10).toFixed(2), // Mbps
+    latency: (Math.random() * 50 + 5).toFixed(2), // ms
+  };
+}
 
 // API endpoints
 app.post("/api/scan", (req, res) => {
@@ -33,13 +47,20 @@ app.post("/api/scan", (req, res) => {
       console.error("Scan error:", error);
       return res.status(500).json({ error: "Scan failed" });
     }
-
+    // Parse arp -a output
     const newDevices = parseArpOutput(stdout);
-    devices.push(...newDevices);
-
+    // Remove duplicates from global devices array by IP
+    for (const device of newDevices) {
+      const existingIdx = devices.findIndex((d) => d.ip === device.ip);
+      if (existingIdx === -1) {
+        devices.push(device);
+      } else {
+        // Optionally update the device info if needed
+        devices[existingIdx] = { ...devices[existingIdx], ...device };
+      }
+    }
     // Notify all clients
     io.emit("device-update", newDevices);
-
     res.json(newDevices);
   });
 });
@@ -49,12 +70,23 @@ app.get("/api/devices", (req, res) => {
 });
 
 app.get("/api/users", (req, res) => {
-  res.json(users);
+  // Attach network metrics to each user
+  const usersWithMetrics = users.map((u) => ({
+    ...u,
+    networkMetrics: getMockNetworkMetrics(u.id),
+  }));
+  res.json(usersWithMetrics);
 });
 
 app.post("/api/connect", (req, res) => {
   const { userId, connectionType } = req.body;
   const sourceId = req.body.sourceId || "user-1"; // Default for demo
+
+  // Helper to get user network (assume user has 'network' property, e.g., subnet or router IP)
+  function getUserNetwork(userId) {
+    const user = users.find((u) => u.id === userId);
+    return user && user.network ? user.network : null;
+  }
 
   // Check if connection is allowed based on network model rules
   if (connectionType === "P2P") {
@@ -76,6 +108,18 @@ app.post("/api/connect", (req, res) => {
       return res
         .status(400)
         .json({ error: "P2P connections are limited to 2 users only" });
+    }
+  }
+
+  // LAN connections: only allow if both users are on the same network
+  if (connectionType === "LAN") {
+    const sourceNetwork = getUserNetwork(sourceId);
+    const targetNetwork = getUserNetwork(userId);
+    if (!sourceNetwork || !targetNetwork || sourceNetwork !== targetNetwork) {
+      return res.status(400).json({
+        error:
+          "LAN connections are only allowed between users on the same network",
+      });
     }
   }
 
@@ -133,35 +177,61 @@ io.on("connection", (socket) => {
 
   // Handle user registration
   socket.on("register-user", (userData) => {
-    // Generate a unique ID if not provided
-    const userId = userData.id || `user-${Date.now()}`;
-
-    // Create or update user
-    const existingUserIndex = users.findIndex((u) => u.id === userId);
-    const user = {
-      id: userId,
-      name: userData.name || `User-${users.length + 1}`,
-      status: "online",
-    };
-
-    if (existingUserIndex !== -1) {
-      // Update existing user
-      users[existingUserIndex] = user;
+    // Use a unique identifier for the user (e.g., userData.id or userData.name)
+    let userId = userData.id || `user-${Date.now()}`;
+    // Check if a user with the same name or id is already connected (regardless of device name)
+    let existingUser = users.find(
+      (u) => u.id === userId || u.name === userData.name
+    );
+    let user;
+    if (existingUser) {
+      // Prevent duplicate user registration (even if device name is different)
+      user = { ...existingUser, status: "online" };
+      // Update user in users array
+      const idx = users.findIndex((u) => u.id === user.id);
+      users[idx] = user;
+      userId = user.id;
     } else {
       // Add new user
+      user = {
+        id: userId,
+        name: userData.name || `User-${users.length + 1}`,
+        status: "online",
+      };
       users.push(user);
     }
-
+    // Map socket to userId
+    socketUserMap.set(socket.id, userId);
     // Acknowledge registration with user data
     socket.emit("user-registered", user);
-
     // Notify all clients about updated user list
     io.emit("user-update", users);
   });
 
   // Handle disconnection
   socket.on("disconnect", () => {
-    // If we stored the user ID on the socket, we could mark them as offline here
+    const userId = socketUserMap.get(socket.id);
+    if (userId) {
+      // Mark user as offline
+      const userIdx = users.findIndex((u) => u.id === userId);
+      if (userIdx !== -1) {
+        users[userIdx].status = "offline";
+      }
+      // Remove mapping
+      socketUserMap.delete(socket.id);
+    }
+    // If no users are online, clear all memory
+    const onlineUsers = users.filter((u) => u.status === "online");
+    if (onlineUsers.length === 0) {
+      users.length = 0;
+      connections.length = 0;
+      devices.length = 0;
+      socketUserMap.clear();
+      console.log("All users disconnected. Memory cleared.");
+    }
+    io.emit("user-update", users);
+    io.emit("connection-update", connections);
+    io.emit("device-update", devices);
     console.log("Client disconnected");
   });
 
@@ -198,42 +268,50 @@ function simulateDevices() {
 // Add this function to parse arp -a output
 function parseArpOutput(output) {
   const lines = output.split("\n");
-  const devices = [];
-
+  const newDevices = [];
   for (const line of lines) {
-    // Match IP and MAC addresses in arp output
-    // Format varies by OS, but this should work for macOS
-    const match = line.match(/\(([0-9.]+)\) at ([0-9a-f:]+)/i);
-
+    // Match IP and MAC addresses in arp output, and extract hostname/SSID
+    // Example: divines-mbp (192.168.1.173) at a4:83:e7:68:e2:30 on en0 ifscope permanent [ethernet]
+    // Example router: MyRouterSSID (192.168.1.1) at 00:1a:2b:3c:4d:5e on en0 ifscope [ethernet]
+    const match = line.match(/^([\w\-]+) \(([0-9.]+)\) at ([0-9a-f:]+)/i);
     if (match) {
-      const ip = match[1];
-      const mac = match[2];
-
-      // Try to determine device type based on MAC prefix or IP pattern
+      const hostnameOrSSID = match[1];
+      const ip = match[2];
+      const mac = match[3];
       let type = "computer";
-
-      // Simple heuristic for device type (can be improved)
+      let name = hostnameOrSSID;
+      // Try to detect OS name from the hostname if possible
+      // e.g., "iPhone", "android", "windows", "macbook", etc.
+      const osNameMatch = hostnameOrSSID.match(
+        /(iphone|android|windows|macbook|mac|ipad|linux|ubuntu|pixel|galaxy|samsung|xiaomi|huawei|oneplus|ipad|surface)/i
+      );
+      if (osNameMatch) {
+        name = osNameMatch[0];
+      }
+      // Heuristic: if IP is typical router IP, treat as router and use SSID as name
       if (ip.startsWith("192.168.1.1") || ip.startsWith("10.0.0.1")) {
         type = "router";
+        name = hostnameOrSSID; // SSID for router
       } else if (
         mac.toLowerCase().startsWith("a8:") ||
         mac.toLowerCase().startsWith("ac:")
       ) {
         type = "smartphone";
       }
-
-      devices.push({
-        id: `device-${Date.now()}-${devices.length}`,
-        name: `Device-${devices.length + 1}`,
-        ip,
-        mac,
-        type,
-        status: "online",
-      });
+      // Avoid duplicates by IP address
+      if (!newDevices.some((d) => d.ip === ip)) {
+        newDevices.push({
+          id: `device-${Date.now()}-${newDevices.length}`,
+          name,
+          ip,
+          mac,
+          type,
+          status: "online",
+        });
+      }
     }
   }
-
-  return devices;
+  return newDevices;
 }
 
 // You can also uncomment and rename the parseArpScanOutput function if you prefer

@@ -54,6 +54,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
     (user) => currentUser && user.id !== currentUser.id
   );
 
+  // Find the selected user object
+  const selectedUserObj = users.find((user) => user.id === selectedUser);
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -149,6 +152,24 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
               </div>
             )}
           </div>
+
+          {/* Conditionally render selected user's metrics */}
+          {selectedUserObj && (
+            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+              <h5 className="text-xs font-semibold mb-1 text-blue-700 dark:text-blue-300">
+                {selectedUserObj.name}'s Network Metrics
+              </h5>
+              <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
+                {selectedUserObj.network && (
+                  <li>Network: {selectedUserObj.network}</li>
+                )}
+                {selectedUserObj.status && (
+                  <li>Status: {selectedUserObj.status}</li>
+                )}
+                {/* Add more metrics as needed */}
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end space-x-3">
