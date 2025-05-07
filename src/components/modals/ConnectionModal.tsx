@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { X, Link, User } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { X, Link, User, AlertTriangle } from "lucide-react";
 import { useNetwork } from "../../context/NetworkContext";
 
 interface ConnectionModalProps {
@@ -7,14 +7,43 @@ interface ConnectionModalProps {
 }
 
 const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
-  const { users, currentUser, connectToUser } = useNetwork();
+  const { users, currentUser, connectToUser, canConnectToUser, connections } =
+    useNetwork();
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [connectionType, setConnectionType] = useState<"P2P" | "LAN" | "WAN">(
     "P2P"
   );
+  const [canConnect, setCanConnect] = useState<boolean>(false);
+  const [connectionMessage, setConnectionMessage] = useState<string>("");
+
+  // Check connection status whenever user or connection type changes
+  useEffect(() => {
+    if (selectedUser) {
+      const isConnectionAllowed = canConnectToUser(
+        selectedUser,
+        connectionType
+      );
+      setCanConnect(isConnectionAllowed);
+
+      if (!isConnectionAllowed) {
+        if (connectionType === "P2P") {
+          setConnectionMessage(
+            "P2P connections are limited to 2 users only (1-to-1)"
+          );
+        } else {
+          setConnectionMessage("Connection already exists or is not allowed");
+        }
+      } else {
+        setConnectionMessage("");
+      }
+    } else {
+      setCanConnect(false);
+      setConnectionMessage("");
+    }
+  }, [selectedUser, connectionType, canConnectToUser]);
 
   const handleConnect = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || !canConnect) return;
 
     await connectToUser(selectedUser, connectionType);
     onClose();
@@ -96,7 +125,8 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
             {connectionType === "P2P" ? (
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Peer-to-Peer connections establish a direct link between users,
-                without going through a central server.
+                without going through a central server. Limited to 1-to-1
+                connections only.
               </p>
             ) : connectionType === "LAN" ? (
               <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -105,9 +135,18 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
               </p>
             ) : (
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Wireless Local Area Network connections use Wi-Fi to communicate
-                through your wireless access point or router.
+                Wide Area Network connections use internet infrastructure to
+                connect users across different networks.
               </p>
+            )}
+
+            {connectionMessage && (
+              <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded flex items-start">
+                <AlertTriangle className="h-4 w-4 text-yellow-500 dark:text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                  {connectionMessage}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -118,10 +157,12 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
           </button>
           <button
             className={`btn btn-primary flex items-center space-x-2 ${
-              !selectedUser ? "opacity-50 cursor-not-allowed" : ""
+              !selectedUser || !canConnect
+                ? "opacity-50 cursor-not-allowed"
+                : ""
             }`}
             onClick={handleConnect}
-            disabled={!selectedUser}
+            disabled={!selectedUser || !canConnect}
           >
             <User className="h-5 w-5" />
             <span>Connect</span>

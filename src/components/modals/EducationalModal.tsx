@@ -67,6 +67,9 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
                   Used in applications like file sharing, video calls, and
                   gaming
                 </li>
+                <li className="font-semibold text-green-700 dark:text-green-400">
+                  Limited to 1-to-1 connections only (two users per connection)
+                </li>
               </ul>
               <h4 className="font-bold mb-2">Technologies:</h4>
               <p className="mb-4">

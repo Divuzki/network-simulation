@@ -1,8 +1,8 @@
-const express = require('express');
-const http = require('http');
-const cors = require('cors');
-const { Server } = require('socket.io');
-const { exec } = require('child_process');
+const express = require("express");
+const http = require("http");
+const cors = require("cors");
+const { Server } = require("socket.io");
+const { exec } = require("child_process");
 
 // Create Express app
 const app = express();
@@ -15,9 +15,9 @@ const server = http.createServer(app);
 // Create Socket.IO server
 const io = new Server(server, {
   cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
-  }
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
 });
 
 // In-memory storage for demonstration
@@ -26,88 +26,124 @@ const users = [];
 const connections = [];
 
 // API endpoints
-app.post('/api/scan', (req, res) => {
+app.post("/api/scan", (req, res) => {
   // Use arp-scan to get actual network devices
-  exec('arp -a', (error, stdout) => {
+  exec("arp -a", (error, stdout) => {
     if (error) {
-      console.error('Scan error:', error);
-      return res.status(500).json({ error: 'Scan failed' });
+      console.error("Scan error:", error);
+      return res.status(500).json({ error: "Scan failed" });
     }
-    
+
     const newDevices = parseArpOutput(stdout);
     devices.push(...newDevices);
-    
+
     // Notify all clients
-    io.emit('device-update', newDevices);
-    
+    io.emit("device-update", newDevices);
+
     res.json(newDevices);
   });
 });
 
-app.get('/api/devices', (req, res) => {
+app.get("/api/devices", (req, res) => {
   res.json(devices);
 });
 
-app.get('/api/users', (req, res) => {
+app.get("/api/users", (req, res) => {
   res.json(users);
 });
 
-app.post('/api/connect', (req, res) => {
+app.post("/api/connect", (req, res) => {
   const { userId, connectionType } = req.body;
-  const sourceId = req.body.sourceId || 'user-1'; // Default for demo
-  
+  const sourceId = req.body.sourceId || "user-1"; // Default for demo
+
+  // Check if connection is allowed based on network model rules
+  if (connectionType === "P2P") {
+    // For P2P connections, check if either user already has a P2P connection
+    const sourceP2PConnections = connections.filter(
+      (conn) =>
+        conn.type === "P2P" &&
+        (conn.sourceId === sourceId || conn.targetId === sourceId)
+    );
+
+    const targetP2PConnections = connections.filter(
+      (conn) =>
+        conn.type === "P2P" &&
+        (conn.sourceId === userId || conn.targetId === userId)
+    );
+
+    // P2P connections are limited to 2 users only (1-to-1)
+    if (sourceP2PConnections.length > 0 || targetP2PConnections.length > 0) {
+      return res
+        .status(400)
+        .json({ error: "P2P connections are limited to 2 users only" });
+    }
+  }
+
+  // Check if connection already exists between these users
+  const existingConnection = connections.find(
+    (conn) =>
+      (conn.sourceId === sourceId && conn.targetId === userId) ||
+      (conn.sourceId === userId && conn.targetId === sourceId)
+  );
+
+  if (existingConnection) {
+    return res
+      .status(400)
+      .json({ error: "Connection already exists between these users" });
+  }
+
   // Create new connection
   const newConnection = {
     id: `conn-${Date.now()}`,
     sourceId,
     targetId: userId,
     type: connectionType,
-    status: 'active',
-    established: new Date().toISOString()
+    status: "active",
+    established: new Date().toISOString(),
   };
-  
+
   connections.push(newConnection);
-  
+
   // Notify all clients
-  io.emit('connection-update', connections);
-  
+  io.emit("connection-update", connections);
+
   res.json(newConnection);
 });
 
-app.delete('/api/connections/:id', (req, res) => {
+app.delete("/api/connections/:id", (req, res) => {
   const { id } = req.params;
-  
+
   // Remove connection
-  const index = connections.findIndex(conn => conn.id === id);
+  const index = connections.findIndex((conn) => conn.id === id);
   if (index !== -1) {
     connections.splice(index, 1);
-    
+
     // Notify all clients
-    io.emit('connection-update', connections);
-    
+    io.emit("connection-update", connections);
+
     res.status(200).json({ success: true });
   } else {
-    res.status(404).json({ error: 'Connection not found' });
+    res.status(404).json({ error: "Connection not found" });
   }
 });
 
 // Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log('New client connected');
-  
+io.on("connection", (socket) => {
+  console.log("New client connected");
+
   // Handle user registration
-  socket.on('register-user', (userData) => {
+  socket.on("register-user", (userData) => {
     // Generate a unique ID if not provided
     const userId = userData.id || `user-${Date.now()}`;
-    
+
     // Create or update user
-    const existingUserIndex = users.findIndex(u => u.id === userId);
+    const existingUserIndex = users.findIndex((u) => u.id === userId);
     const user = {
       id: userId,
       name: userData.name || `User-${users.length + 1}`,
-      status: 'online'
+      status: "online",
     };
-    
+
     if (existingUserIndex !== -1) {
       // Update existing user
       users[existingUserIndex] = user;
@@ -115,84 +151,88 @@ io.on('connection', (socket) => {
       // Add new user
       users.push(user);
     }
-    
+
     // Acknowledge registration with user data
-    socket.emit('user-registered', user);
-    
+    socket.emit("user-registered", user);
+
     // Notify all clients about updated user list
-    io.emit('user-update', users);
+    io.emit("user-update", users);
   });
-  
+
   // Handle disconnection
-  socket.on('disconnect', () => {
+  socket.on("disconnect", () => {
     // If we stored the user ID on the socket, we could mark them as offline here
-    console.log('Client disconnected');
+    console.log("Client disconnected");
   });
-  
+
   // Send current data to newly connected client
-  socket.emit('device-update', devices);
-  socket.emit('user-update', users);
-  socket.emit('connection-update', connections);
+  socket.emit("device-update", devices);
+  socket.emit("user-update", users);
+  socket.emit("connection-update", connections);
 });
 
 // Utility functions
 function simulateDevices() {
   const numDevices = Math.floor(Math.random() * 3) + 1; // 1-3 devices
   const newDevices = [];
-  
+
   for (let i = 0; i < numDevices; i++) {
-    const deviceTypes = ['computer', 'router', 'smartphone'];
+    const deviceTypes = ["computer", "router", "smartphone"];
     const type = deviceTypes[Math.floor(Math.random() * deviceTypes.length)];
-    
+
     newDevices.push({
       id: `device-${Date.now()}-${i}`,
       name: `${type}-${Math.floor(Math.random() * 100)}`,
       ip: `192.168.1.${Math.floor(Math.random() * 255)}`,
-      mac: `00:1A:2B:${Math.floor(Math.random() * 100)}:${Math.floor(Math.random() * 100)}:${Math.floor(Math.random() * 100)}`,
+      mac: `00:1A:2B:${Math.floor(Math.random() * 100)}:${Math.floor(
+        Math.random() * 100
+      )}:${Math.floor(Math.random() * 100)}`,
       type,
-      status: 'online'
+      status: "online",
     });
   }
-  
+
   return newDevices;
 }
 
 // Add this function to parse arp -a output
 function parseArpOutput(output) {
-  const lines = output.split('\n');
+  const lines = output.split("\n");
   const devices = [];
-  
+
   for (const line of lines) {
     // Match IP and MAC addresses in arp output
     // Format varies by OS, but this should work for macOS
     const match = line.match(/\(([0-9.]+)\) at ([0-9a-f:]+)/i);
-    
+
     if (match) {
       const ip = match[1];
       const mac = match[2];
-      
+
       // Try to determine device type based on MAC prefix or IP pattern
-      let type = 'computer';
-      
+      let type = "computer";
+
       // Simple heuristic for device type (can be improved)
-      if (ip.startsWith('192.168.1.1') || ip.startsWith('10.0.0.1')) {
-        type = 'router';
-      } else if (mac.toLowerCase().startsWith('a8:') || 
-                mac.toLowerCase().startsWith('ac:')) {
-        type = 'smartphone';
+      if (ip.startsWith("192.168.1.1") || ip.startsWith("10.0.0.1")) {
+        type = "router";
+      } else if (
+        mac.toLowerCase().startsWith("a8:") ||
+        mac.toLowerCase().startsWith("ac:")
+      ) {
+        type = "smartphone";
       }
-      
+
       devices.push({
         id: `device-${Date.now()}-${devices.length}`,
         name: `Device-${devices.length + 1}`,
         ip,
         mac,
         type,
-        status: 'online'
+        status: "online",
       });
     }
   }
-  
+
   return devices;
 }
 
@@ -200,14 +240,14 @@ function parseArpOutput(output) {
 // function parseArpOutput(output) {
 //   const lines = output.split('\n');
 //   const devices = [];
-//   
+//
 //   for (const line of lines) {
 //     if (line.includes('192.168.') || line.includes('10.0.')) {
 //       const parts = line.split('\t');
 //       if (parts.length >= 2) {
 //         const ip = parts[0].trim();
 //         const mac = parts[1].trim();
-//         
+//
 //         devices.push({
 //           id: `device-${Date.now()}-${devices.length}`,
 //           name: `Device-${devices.length + 1}`,
@@ -219,7 +259,7 @@ function parseArpOutput(output) {
 //       }
 //     }
 //   }
-//   
+//
 //   return devices;
 // }
 

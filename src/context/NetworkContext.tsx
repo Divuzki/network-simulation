@@ -10,7 +10,7 @@ import { toast } from "react-toastify";
 import { Device, Connection, User } from "../types";
 // import { mockDevices, mockUsers } from '../utils/mockData';
 import { setupSocket } from "../services/socketService";
-import { scanNetwork, getDevices, getUsers } from "../services/apiService";
+import { scanNetwork, getDevices, getUsers, connectToUser, disconnectFromUser } from "../services/apiService";
 
 interface NetworkContextType {
   devices: Device[];
@@ -24,6 +24,7 @@ interface NetworkContextType {
     connectionType: "P2P" | "LAN" | "WAN"
   ) => Promise<void>;
   disconnectFromUser: (connectionId: string) => Promise<void>;
+  canConnectToUser: (userId: string, connectionType: "P2P" | "LAN" | "WAN") => boolean;
 }
 
 const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
@@ -42,16 +43,27 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
     // Initialize socket connection
     const socket = setupSocket();
 
-    // Register current user
-    const username = prompt("Enter your name:") || `User-${Date.now()}`;
-    const defaultUser: User = {
-      id: `user-${Date.now()}`,
-      name: username,
-      status: "online",
-    };
+    // Get device name to use as username
+    getDevices()
+      .then((response) => {
+        // Find this device or use a default name
+        const thisDevice = response.data.find(d => d.type === "computer") || response.data[0];
+        const deviceName = thisDevice ? thisDevice.name : `Device-${Date.now()}`;
+        
+        // Create user with device name
+        const defaultUser: User = {
+          id: `user-${Date.now()}`,
+          name: deviceName,
+          status: "online",
+        };
+        
+        // Register with the server
+        socket.emit("register-user", defaultUser);
 
-    // Register with the server
-    socket.emit("register-user", defaultUser);
+      })
+     .catch((error) => {
+        console.error("Error fetching devices:", error);
+      });
 
     // Handle successful registration
     socket.on("user-registered", (registeredUser: User) => {
@@ -130,11 +142,59 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, []);
 
+  // Check if a connection is allowed based on network model rules
+  const canConnectToUser = useCallback(
+    (userId: string, connectionType: "P2P" | "LAN" | "WAN"): boolean => {
+      if (!currentUser) return false;
+      
+      // For P2P connections, check if either user already has a P2P connection
+      if (connectionType === "P2P") {
+        // Count existing P2P connections for both users
+        const sourceP2PConnections = connections.filter(
+          conn => 
+            conn.type === "P2P" && 
+            (conn.sourceId === currentUser.id || conn.targetId === currentUser.id)
+        );
+        
+        const targetP2PConnections = connections.filter(
+          conn => 
+            conn.type === "P2P" && 
+            (conn.sourceId === userId || conn.targetId === userId)
+        );
+        
+        // P2P connections are limited to 2 users only (1-to-1)
+        if (sourceP2PConnections.length > 0 || targetP2PConnections.length > 0) {
+          return false;
+        }
+      }
+      
+      // Check if connection already exists between these users
+      const existingConnection = connections.find(
+        conn => 
+          (conn.sourceId === currentUser.id && conn.targetId === userId) ||
+          (conn.sourceId === userId && conn.targetId === currentUser.id)
+      );
+      
+      return !existingConnection;
+    },
+    [connections, currentUser]
+  );
+
   // Connect to user function
   const handleConnectToUser = useCallback(
     async (userId: string, connectionType: "P2P" | "LAN" | "WAN") => {
       if (!currentUser) {
         toast.error("You must be logged in to connect");
+        return;
+      }
+      
+      // Check if connection is allowed based on network model rules
+      if (!canConnectToUser(userId, connectionType)) {
+        if (connectionType === "P2P") {
+          toast.error("P2P connections are limited to 2 users only");
+        } else {
+          toast.error("Connection already exists or is not allowed");
+        }
         return;
       }
 
@@ -148,10 +208,15 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         toast.success(`Connected to user via ${connectionType}`);
       } catch (error) {
         console.error("Error connecting to user:", error);
-        toast.error("Failed to connect to user");
+        // Display specific error message from server if available
+        if (error.response && error.response.data && error.response.data.error) {
+          toast.error(error.response.data.error);
+        } else {
+          toast.error("Failed to connect to user");
+        }
       }
     },
-    [currentUser]
+    [currentUser, canConnectToUser]
   );
 
   // Disconnect from user function
@@ -177,6 +242,7 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         scanNetwork: handleScanNetwork,
         connectToUser: handleConnectToUser,
         disconnectFromUser: handleDisconnectFromUser,
+        canConnectToUser,
       }}
     >
       {children}
