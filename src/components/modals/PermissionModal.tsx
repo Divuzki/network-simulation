@@ -12,7 +12,7 @@ const PermissionModal: React.FC<PermissionModalProps> = ({ onClose }) => {
 
   const handleScan = async () => {
     if (!hasConsented) return;
-    
+    onClose();
     await scanNetwork();
     onClose();
   };

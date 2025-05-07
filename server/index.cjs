@@ -342,7 +342,7 @@ function parseArpOutput(output) {
 // }
 
 // Start server
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
+const PORT = process.env.PORT || 3002;
+server.listen(PORT, "192.168.1.173", () => {
   console.log(`Server running on port ${PORT}`);
 });

@@ -6,7 +6,7 @@ const mockCallbacks: Record<string, Function> = {};
 // Initialize Socket.io connection
 export const setupSocket = (): Socket => {
   // Connect to the real backend
-  const socket = io('http://localhost:3001');
+  const socket = io("http://192.168.1.173:3002");
   
   return socket;
 };

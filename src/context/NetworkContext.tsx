@@ -133,6 +133,19 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         console.error("Error fetching users:", error);
       });
 
+    // Fetch network metrics for all users and merge into user objects
+    getUsers()
+      .then((response) => {
+        const usersWithMetrics = response.data.map((u: any) => ({
+          ...u,
+          networkMetrics: u.networkMetrics || null,
+        }));
+        setUsers(usersWithMetrics);
+      })
+      .catch((error) => {
+        console.error("Error fetching user metrics:", error);
+      });
+
     return () => {
       socket.disconnect();
     };

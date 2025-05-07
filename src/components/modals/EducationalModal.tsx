@@ -302,7 +302,7 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="modal-content max-w-xl"
+        className="modal-content max-w-xl relative overflow-auto max-md:h-[80%]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center modal-header">

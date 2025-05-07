@@ -10,6 +10,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
   const { users, currentUser, connectToUser, canConnectToUser, connections } =
     useNetwork();
   const [selectedUser, setSelectedUser] = useState<string>("");
+  const [selectedUserMetrics, setSelectedUserMetrics] = useState<any>(null);
   const [connectionType, setConnectionType] = useState<"P2P" | "LAN" | "WAN">(
     "P2P"
   );
@@ -40,8 +41,13 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
       setCanConnect(false);
       setConnectionMessage("");
     }
-  }, [selectedUser, connectionType, canConnectToUser]);
-
+    if (selectedUser) {
+      const user = users.find((u) => u.id === selectedUser);
+      setSelectedUserMetrics(user?.networkMetrics || null);
+    } else {
+      setSelectedUserMetrics(null);
+    }
+  }, [selectedUser, users]);
   const handleConnect = async () => {
     if (!selectedUser || !canConnect) return;
 
@@ -53,9 +59,6 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
   const availableUsers = users.filter(
     (user) => currentUser && user.id !== currentUser.id
   );
-
-  // Find the selected user object
-  const selectedUserObj = users.find((user) => user.id === selectedUser);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -84,7 +87,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
                 id="user-select"
                 value={selectedUser}
                 onChange={(e) => setSelectedUser(e.target.value)}
-                className="input w-full"
+                className="w-full p-2 border rounded mb-4"
               >
                 <option value="">Select a user...</option>
                 {availableUsers.map((user) => (
@@ -94,8 +97,53 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
                 ))}
               </select>
             ) : (
-              <div className="input w-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                No other users available
+              <div className="text-gray-500 mb-4">No other users available</div>
+            )}
+            {selectedUserMetrics && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4 border border-blue-100 dark:border-blue-900">
+                <h3 className="text-lg font-semibold mb-2 text-blue-700 dark:text-blue-300">
+                  Router Network Metrics
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="block text-xs text-gray-500">
+                      Upload Speed
+                    </span>
+                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                      {selectedUserMetrics.uploadSpeed} Mbps
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500">
+                      Download Speed
+                    </span>
+                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                      {selectedUserMetrics.downloadSpeed} Mbps
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500">
+                      Packet Loss
+                    </span>
+                    <span className="font-bold text-red-600 dark:text-red-400">
+                      {selectedUserMetrics.packetLoss} %
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500">
+                      Throughput
+                    </span>
+                    <span className="font-bold text-green-600 dark:text-green-400">
+                      {selectedUserMetrics.throughput} Mbps
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500">Latency</span>
+                    <span className="font-bold text-purple-600 dark:text-purple-400">
+                      {selectedUserMetrics.latency} ms
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -152,24 +200,6 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
               </div>
             )}
           </div>
-
-          {/* Conditionally render selected user's metrics */}
-          {selectedUserObj && (
-            <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-              <h5 className="text-xs font-semibold mb-1 text-blue-700 dark:text-blue-300">
-                {selectedUserObj.name}'s Network Metrics
-              </h5>
-              <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
-                {selectedUserObj.network && (
-                  <li>Network: {selectedUserObj.network}</li>
-                )}
-                {selectedUserObj.status && (
-                  <li>Status: {selectedUserObj.status}</li>
-                )}
-                {/* Add more metrics as needed */}
-              </ul>
-            </div>
-          )}
         </div>
 
         <div className="flex justify-end space-x-3">
