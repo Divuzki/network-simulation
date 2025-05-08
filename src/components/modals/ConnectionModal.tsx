@@ -101,7 +101,10 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal-content relative overflow-auto max-md:h-[80%]"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex justify-between items-center modal-header">
           <h3 className="flex items-center space-x-2">
             <Link className="h-5 w-5 text-blue-500" />

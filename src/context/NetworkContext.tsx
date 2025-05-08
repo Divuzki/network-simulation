@@ -8,7 +8,6 @@ import React, {
 } from "react";
 import { toast } from "react-toastify";
 import { Device, Connection, User } from "../types";
-// import { mockDevices, mockUsers } from '../utils/mockData';
 import { setupSocket } from "../services/socketService";
 import {
   scanNetwork,

@@ -80,7 +80,7 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
               <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   In our visualization, P2P connections are shown as{" "}
-                  <span className="connection-p2p">solid green lines</span>
+                  <span className="connection-p2p">solid green lines </span>
                   between nodes.
                 </p>
               </div>
@@ -114,7 +114,7 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
               <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   In our visualization, LAN connections are shown as{" "}
-                  <span className="connection-lan">dashed blue lines</span>
+                  <span className="connection-lan">dashed blue lines </span>
                   between nodes, typically passing through a router.
                 </p>
               </div>
@@ -147,7 +147,7 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
               <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   In our visualization, WAN connections are shown as{" "}
-                  <span className="connection-wan">dashed purple lines</span>
+                  <span className="connection-wan">dashed purple lines{" "}</span>
                   between nodes, typically connecting through a wireless access
                   point.
                 </p>
@@ -186,7 +186,7 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   In our visualization, routers are shown as{" "}
                   <span className="text-red-500 dark:text-red-400 font-medium">
-                    red nodes
+                    red nodes{" "}
                   </span>
                   and typically serve as central connection points for LAN and
                   WAN connections.
