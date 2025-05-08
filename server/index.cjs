@@ -26,48 +26,134 @@ const users = [];
 const connections = [];
 const socketUserMap = new Map(); // Map socket.id to userId
 
-// --- Network metrics mock function ---
+// --- Network metrics ---
 const util = require("util");
 const execAsync = util.promisify(exec);
 
-async function getRealNetworkMetrics(userId) {
-  // Run speedtest-cli for upload/download speed and latency
+// Cache for speedtest-cli results
+const speedTestCache = {
+  data: null,
+  timestamp: 0,
+  ttl: 5 * 60 * 1000, // 5 minutes TTL
+};
+
+async function getRealNetworkMetrics(entityId) {
+  // Renamed userId to entityId for clarity
   let uploadSpeed = null;
   let downloadSpeed = null;
   let latency = null;
-  let throughput = null;
   let packetLoss = null;
-  try {
-    const { stdout: speedtestOut } = await execAsync("speedtest-cli --simple");
-    // Parse output: e.g.,
-    // Ping: 12.345 ms
-    // Download: 123.45 Mbit/s
-    // Upload: 67.89 Mbit/s
-    const pingMatch = speedtestOut.match(/Ping:\s*([\d.]+)\s*ms/);
-    const downloadMatch = speedtestOut.match(/Download:\s*([\d.]+)\s*Mbit\/s/);
-    const uploadMatch = speedtestOut.match(/Upload:\s*([\d.]+)\s*Mbit\/s/);
-    if (pingMatch) latency = parseFloat(pingMatch[1]);
-    if (downloadMatch) downloadSpeed = parseFloat(downloadMatch[1]);
-    if (uploadMatch) uploadSpeed = parseFloat(uploadMatch[1]);
-    throughput = downloadSpeed;
-  } catch (err) {
-    // Fallback to nulls
+  let throughput = null;
+
+  // 1. Get Download/Upload speeds (from cache or new test)
+  const currentTime = Date.now();
+  if (
+    speedTestCache.data &&
+    currentTime - speedTestCache.timestamp < speedTestCache.ttl
+  ) {
+    console.log(`Using cached speedtest data for ${entityId}`);
+    const cached = speedTestCache.data;
+    uploadSpeed = cached.uploadSpeed;
+    downloadSpeed = cached.downloadSpeed;
+  } else {
+    console.log(`Running speedtest-cli for ${entityId}`);
+    try {
+      // Use speedtest-cli to get network speeds
+      const { stdout: speedtestCliOut } = await execAsync(
+        "speedtest-cli --json"
+      );
+      const speedData = JSON.parse(speedtestCliOut);
+
+      if (speedData && speedData.download) {
+        // speedtest-cli returns download/upload in bits/sec
+        downloadSpeed = parseFloat((speedData.download / 1000000).toFixed(2)); // Convert to Mbps
+      }
+      if (speedData && speedData.upload) {
+        uploadSpeed = parseFloat((speedData.upload / 1000000).toFixed(2)); // Convert to Mbps
+      }
+
+      speedTestCache.data = { downloadSpeed, uploadSpeed };
+      speedTestCache.timestamp = currentTime;
+      console.log(
+        `Speedtest.net test for ${entityId} completed. Download: ${downloadSpeed} Mbps, Upload: ${uploadSpeed} Mbps`
+      );
+    } catch (err) {
+      console.error(`speedtest-cli error for ${entityId}: ${err.message}`);
+      speedTestCache.data = null;
+      speedTestCache.timestamp = 0;
+    }
   }
-  try {
-    // Use ping to google.com for packet loss
-    const { stdout: pingOut } = await execAsync("ping -c 10 google.com");
-    // Look for '10 packets transmitted, 10 received, 0% packet loss'
-    const lossMatch = pingOut.match(/(\d+)% packet loss/);
-    if (lossMatch) packetLoss = parseFloat(lossMatch[1]);
-  } catch (err) {
-    // Fallback to null
+  throughput = downloadSpeed;
+
+  // 2. Get Latency/Packet Loss using ping
+  let pingTarget = "8.8.8.8"; // Default to public DNS (Google DNS)
+
+  const device = devices.find((d) => d.id === entityId && d.ip);
+  if (device) {
+    pingTarget = device.ip;
+    console.log(`Pinging device IP ${pingTarget} for ${entityId}`);
+  } else {
+    console.log(
+      `Pinging public DNS ${pingTarget} for ${entityId} (entity not found in devices or no IP)`
+    );
   }
+
+  try {
+    const pingCommand = `ping -c 4 -t 5 ${pingTarget}`;
+    const { stdout: pingOut, stderr: pingErr } = await execAsync(pingCommand);
+
+    if (pingErr && pingErr.trim() !== "") {
+      console.warn(`Ping stderr for ${pingTarget} (${entityId}): ${pingErr}`);
+    }
+
+    const latencyMatch = pingOut.match(
+      /round-trip min\/avg\/max\/(?:stddev|mdev) = [\d.]+\/([\d.]+)\/[\d.]+\/[\d.]+ ms/
+    );
+    if (latencyMatch && latencyMatch[1]) {
+      latency = parseFloat(latencyMatch[1]);
+    } else {
+      const rttMatch = pingOut.match(/time=([\d.]+) ms/);
+      if (rttMatch && rttMatch[1]) {
+        latency = parseFloat(rttMatch[1]);
+        console.log(
+          `Used fallback RTT for latency for ${pingTarget}: ${latency} ms`
+        );
+      } else {
+        console.warn(
+          `Could not parse average latency from ping output for ${pingTarget}:\n${pingOut}`
+        );
+      }
+    }
+
+    const lossMatch = pingOut.match(/([\d.]+)% packet loss/);
+    if (lossMatch && lossMatch[1]) {
+      packetLoss = parseFloat(lossMatch[1]);
+    } else {
+      console.warn(
+        `Could not parse packet loss from ping output for ${pingTarget}:\n${pingOut}`
+      );
+    }
+    console.log(
+      `Ping to ${pingTarget} for ${entityId} completed. Latency: ${latency}, Packet Loss: ${packetLoss}`
+    );
+  } catch (err) {
+    console.error(
+      `Ping command error for ${pingTarget} (${entityId}): ${err.message}`
+    );
+    packetLoss = 100.0;
+    latency = null;
+    if (err.stdout) console.error(`Ping stdout on error: ${err.stdout}`);
+    if (err.stderr) console.error(`Ping stderr on error: ${err.stderr}`);
+  }
+
   return {
-    uploadSpeed: uploadSpeed !== null ? uploadSpeed.toFixed(2) : null,
-    downloadSpeed: downloadSpeed !== null ? downloadSpeed.toFixed(2) : null,
-    packetLoss: packetLoss !== null ? packetLoss.toFixed(2) : null,
-    throughput: throughput !== null ? throughput.toFixed(2) : null,
-    latency: latency !== null ? latency.toFixed(2) : null,
+    uploadSpeed:
+      uploadSpeed !== null ? parseFloat(uploadSpeed.toFixed(2)) : null,
+    downloadSpeed:
+      downloadSpeed !== null ? parseFloat(downloadSpeed.toFixed(2)) : null,
+    packetLoss: packetLoss !== null ? parseFloat(packetLoss.toFixed(2)) : null,
+    throughput: throughput !== null ? parseFloat(throughput.toFixed(2)) : null,
+    latency: latency !== null ? parseFloat(latency.toFixed(2)) : null,
   };
 }
 
