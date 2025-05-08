@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   ChevronRight,
-  ChevronDown,
   ChevronLeft,
   Laptop,
   Router,
