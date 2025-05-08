@@ -133,7 +133,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
                       key={connection.id}
                       className="p-3 border rounded-lg bg-white dark:bg-gray-800"
                     >
-                      <div className="flex justify-between items-center">
+                      <div className="flex flex-wrap justify-between items-center">
                         <div className="flex items-center space-x-2">
                           <User className="h-5 w-5 text-blue-500" />
                           <span className="font-medium">{otherUser.name}</span>
