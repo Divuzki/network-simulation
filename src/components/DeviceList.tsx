@@ -2,11 +2,13 @@ import React, { useState } from "react";
 import {
   ChevronRight,
   ChevronDown,
+  ChevronLeft,
   Laptop,
   Router,
   Smartphone,
   Network,
   User,
+  Zap,
 } from "lucide-react";
 import { useNetwork } from "../context/NetworkContext";
 
@@ -16,7 +18,16 @@ interface DeviceListProps {
 
 const DeviceList: React.FC<DeviceListProps> = ({ onConnect }) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const { devices, users, connections } = useNetwork();
+  const {
+    devices,
+    users,
+    connections,
+    currentUser,
+    testConnectionBetweenUsers,
+  } = useNetwork();
+  const [isTestingConnection, setIsTestingConnection] = useState<string | null>(
+    null
+  );
 
   const toggleExpand = () => {
     setIsExpanded(!isExpanded);
@@ -85,7 +96,7 @@ const DeviceList: React.FC<DeviceListProps> = ({ onConnect }) => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex space-x-1">
+                  <div className="flex space-x-1 items-center">
                     {connections.some(
                       (c) =>
                         (c.sourceId === user.id || c.targetId === user.id) &&
@@ -113,6 +124,47 @@ const DeviceList: React.FC<DeviceListProps> = ({ onConnect }) => {
                         WAN
                       </span>
                     )}
+
+                    {/* Add network test icon for connected users */}
+                    {currentUser &&
+                      connections.some(
+                        (c) =>
+                          (c.sourceId === currentUser.id &&
+                            c.targetId === user.id) ||
+                          (c.sourceId === user.id &&
+                            c.targetId === currentUser.id)
+                      ) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const connection = connections.find(
+                              (c) =>
+                                (c.sourceId === currentUser.id &&
+                                  c.targetId === user.id) ||
+                                (c.sourceId === user.id &&
+                                  c.targetId === currentUser.id)
+                            );
+                            if (connection) {
+                              setIsTestingConnection(connection.id);
+                              testConnectionBetweenUsers(connection.id).finally(
+                                () => {
+                                  setIsTestingConnection(null);
+                                }
+                              );
+                            }
+                          }}
+                          className="ml-1 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                          title="Test connection speed"
+                        >
+                          <Zap
+                            className={`h-4 w-4 ${
+                              isTestingConnection
+                                ? "text-yellow-500 animate-pulse"
+                                : "text-green-500"
+                            }`}
+                          />
+                        </button>
+                      )}
                   </div>
                 </div>
               ))}
@@ -156,19 +208,19 @@ const DeviceList: React.FC<DeviceListProps> = ({ onConnect }) => {
 };
 
 // ChevronLeft component for sidebar toggle
-const ChevronLeft: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <polyline points="15 18 9 12 15 6"></polyline>
-  </svg>
-);
+// const ChevronLeft: React.FC<{ className?: string }> = ({ className }) => (
+//   <svg
+//     xmlns="http://www.w3.org/2000/svg"
+//     className={className}
+//     viewBox="0 0 24 24"
+//     fill="none"
+//     stroke="currentColor"
+//     strokeWidth="2"
+//     strokeLinecap="round"
+//     strokeLinejoin="round"
+//   >
+//     <polyline points="15 18 9 12 15 6"></polyline>
+//   </svg>
+// );
 
 export default DeviceList;

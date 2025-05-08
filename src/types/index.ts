@@ -13,6 +13,15 @@ export interface User {
   id: string;
   name: string;
   status: "online" | "offline" | "away";
+  networkMetrics?: {
+    downloadSpeed: number;
+    uploadSpeed: number;
+    latency: number;
+    packetLoss?: number;
+    throughput?: number;
+    jitter?: number;
+    maxBandwidth?: number;
+  };
 }
 
 // Connection between nodes
@@ -23,4 +32,12 @@ export interface Connection {
   type: "P2P" | "LAN" | "WAN";
   status: "active" | "inactive" | "pending";
   established: string; // ISO date string
+  lastTest?: {
+    uploadSpeed: number;
+    downloadSpeed: number;
+    latency: number;
+    packetLoss: number;
+    throughput: number;
+    timestamp: string;
+  };
 }

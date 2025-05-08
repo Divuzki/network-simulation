@@ -16,6 +16,7 @@ import {
   getUsers,
   connectToUser,
   disconnectFromUser,
+  testConnectionBetweenUsers,
 } from "../services/apiService";
 
 interface NetworkContextType {
@@ -34,6 +35,7 @@ interface NetworkContextType {
     userId: string,
     connectionType: "P2P" | "LAN" | "WAN"
   ) => boolean;
+  testConnectionBetweenUsers: (connectionId: string) => Promise<void>;
 }
 
 const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
@@ -278,6 +280,19 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, []);
 
+  // Test connection between users
+  const handleTestConnectionBetweenUsers = useCallback(
+    async (connectionId: string) => {
+      try {
+        await testConnectionBetweenUsers(connectionId);
+      } catch (error) {
+        console.error("Error testing connection:", error);
+        toast.error("Failed to test connection");
+      }
+    },
+    []
+  );
+
   return (
     <NetworkContext.Provider
       value={{
@@ -290,6 +305,7 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         connectToUser: handleConnectToUser,
         disconnectFromUser: handleDisconnectFromUser,
         canConnectToUser,
+        testConnectionBetweenUsers: handleTestConnectionBetweenUsers,
       }}
     >
       {children}

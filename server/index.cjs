@@ -27,19 +27,107 @@ const connections = [];
 const socketUserMap = new Map(); // Map socket.id to userId
 
 // --- Network metrics mock function ---
-function getMockNetworkMetrics(userId) {
-  // In a real implementation, gather real metrics here
-  // For demo, return random values
+const util = require("util");
+const execAsync = util.promisify(exec);
+
+async function getRealNetworkMetrics(userId) {
+  // Run speedtest-cli for upload/download speed and latency
+  let uploadSpeed = null;
+  let downloadSpeed = null;
+  let latency = null;
+  let throughput = null;
+  let packetLoss = null;
+  try {
+    const { stdout: speedtestOut } = await execAsync("speedtest-cli --simple");
+    // Parse output: e.g.,
+    // Ping: 12.345 ms
+    // Download: 123.45 Mbit/s
+    // Upload: 67.89 Mbit/s
+    const pingMatch = speedtestOut.match(/Ping:\s*([\d.]+)\s*ms/);
+    const downloadMatch = speedtestOut.match(/Download:\s*([\d.]+)\s*Mbit\/s/);
+    const uploadMatch = speedtestOut.match(/Upload:\s*([\d.]+)\s*Mbit\/s/);
+    if (pingMatch) latency = parseFloat(pingMatch[1]);
+    if (downloadMatch) downloadSpeed = parseFloat(downloadMatch[1]);
+    if (uploadMatch) uploadSpeed = parseFloat(uploadMatch[1]);
+    throughput = downloadSpeed;
+  } catch (err) {
+    // Fallback to nulls
+  }
+  try {
+    // Use ping to google.com for packet loss
+    const { stdout: pingOut } = await execAsync("ping -c 10 google.com");
+    // Look for '10 packets transmitted, 10 received, 0% packet loss'
+    const lossMatch = pingOut.match(/(\d+)% packet loss/);
+    if (lossMatch) packetLoss = parseFloat(lossMatch[1]);
+  } catch (err) {
+    // Fallback to null
+  }
   return {
-    uploadSpeed: (Math.random() * 100 + 10).toFixed(2), // Mbps
-    downloadSpeed: (Math.random() * 100 + 10).toFixed(2), // Mbps
-    packetLoss: (Math.random() * 5).toFixed(2), // %
-    throughput: (Math.random() * 100 + 10).toFixed(2), // Mbps
-    latency: (Math.random() * 50 + 5).toFixed(2), // ms
+    uploadSpeed: uploadSpeed !== null ? uploadSpeed.toFixed(2) : null,
+    downloadSpeed: downloadSpeed !== null ? downloadSpeed.toFixed(2) : null,
+    packetLoss: packetLoss !== null ? packetLoss.toFixed(2) : null,
+    throughput: throughput !== null ? throughput.toFixed(2) : null,
+    latency: latency !== null ? latency.toFixed(2) : null,
   };
 }
 
 // API endpoints
+
+// Test connection speed between two connected users
+app.post("/api/connections/:connectionId/test", async (req, res) => {
+  const { connectionId } = req.params;
+
+  // Find the connection
+  const connection = connections.find((conn) => conn.id === connectionId);
+  if (!connection) {
+    return res.status(404).json({ error: "Connection not found" });
+  }
+
+  try {
+    // Get metrics for both users in the connection
+    const sourceMetrics = await getRealNetworkMetrics(connection.sourceId);
+    const targetMetrics = await getRealNetworkMetrics(connection.targetId);
+
+    // Calculate connection quality between the two users
+    const connectionMetrics = {
+      // Average of both users' metrics
+      uploadSpeed:
+        ((parseFloat(sourceMetrics.uploadSpeed) || 0) +
+          (parseFloat(targetMetrics.uploadSpeed) || 0)) /
+        2,
+      downloadSpeed:
+        ((parseFloat(sourceMetrics.downloadSpeed) || 0) +
+          (parseFloat(targetMetrics.downloadSpeed) || 0)) /
+        2,
+      latency:
+        ((parseFloat(sourceMetrics.latency) || 0) +
+          (parseFloat(targetMetrics.latency) || 0)) /
+        2,
+      packetLoss:
+        ((parseFloat(sourceMetrics.packetLoss) || 0) +
+          (parseFloat(targetMetrics.packetLoss) || 0)) /
+        2,
+      throughput:
+        ((parseFloat(sourceMetrics.throughput) || 0) +
+          (parseFloat(targetMetrics.throughput) || 0)) /
+        2,
+      // Add timestamp for the test
+      timestamp: new Date().toISOString(),
+    };
+
+    // Update the connection with the test results
+    connection.lastTest = connectionMetrics;
+
+    // Notify clients about the updated connection
+    io.emit("connection-update", connections);
+
+    res.json(connectionMetrics);
+  } catch (e) {
+    console.error("Connection test error:", e);
+    res.status(500).json({ error: "Failed to test connection" });
+  }
+});
+
 app.post("/api/scan", (req, res) => {
   // Use arp-scan to get actual network devices
   exec("arp -a", (error, stdout) => {
@@ -69,12 +157,39 @@ app.get("/api/devices", (req, res) => {
   res.json(devices);
 });
 
-app.get("/api/users", (req, res) => {
-  // Attach network metrics to each user
-  const usersWithMetrics = users.map((u) => ({
-    ...u,
-    networkMetrics: getMockNetworkMetrics(u.id),
-  }));
+// Device-specific network metrics endpoint
+app.get("/api/devices/:deviceId/metrics", async (req, res) => {
+  const { deviceId } = req.params;
+  try {
+    const metrics = await getRealNetworkMetrics(deviceId);
+    res.json(metrics);
+  } catch (e) {
+    res.status(500).json({ error: "Failed to get device metrics" });
+  }
+});
+
+app.get("/api/users", async (req, res) => {
+  // Attach real network metrics to each user
+  const usersWithMetrics = await Promise.all(
+    users.map(async (u) => {
+      let metrics = null;
+      try {
+        metrics = await getRealNetworkMetrics(u.id);
+      } catch (e) {
+        metrics = {
+          uploadSpeed: null,
+          downloadSpeed: null,
+          packetLoss: null,
+          throughput: null,
+          latency: null,
+        };
+      }
+      return {
+        ...u,
+        networkMetrics: metrics,
+      };
+    })
+  );
   res.json(usersWithMetrics);
 });
 

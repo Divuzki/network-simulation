@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Link, User, AlertTriangle } from "lucide-react";
+import { X, Link, User, AlertTriangle, Activity, Zap } from "lucide-react";
 import { useNetwork } from "../../context/NetworkContext";
 
 interface ConnectionModalProps {
@@ -7,8 +7,14 @@ interface ConnectionModalProps {
 }
 
 const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
-  const { users, currentUser, connectToUser, canConnectToUser, connections } =
-    useNetwork();
+  const {
+    users,
+    currentUser,
+    connectToUser,
+    canConnectToUser,
+    connections,
+    testConnectionBetweenUsers,
+  } = useNetwork();
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [selectedUserMetrics, setSelectedUserMetrics] = useState<any>(null);
   const [connectionType, setConnectionType] = useState<"P2P" | "LAN" | "WAN">(
@@ -16,6 +22,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
   );
   const [canConnect, setCanConnect] = useState<boolean>(false);
   const [connectionMessage, setConnectionMessage] = useState<string>("");
+  const [isTestingConnection, setIsTestingConnection] =
+    useState<boolean>(false);
+  const [activeConnection, setActiveConnection] = useState<string | null>(null);
 
   // Check connection status whenever user or connection type changes
   useEffect(() => {
@@ -60,6 +69,36 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
     (user) => currentUser && user.id !== currentUser.id
   );
 
+  // Find existing connections with the current user
+  const userConnections = connections.filter(
+    (conn) =>
+      currentUser &&
+      (conn.sourceId === currentUser.id || conn.targetId === currentUser.id)
+  );
+
+  // Handle network test between connected users
+  const handleTestConnection = async (connectionId: string) => {
+    setIsTestingConnection(true);
+    setActiveConnection(connectionId);
+    try {
+      await testConnectionBetweenUsers(connectionId);
+    } catch (error) {
+      console.error("Error testing connection:", error);
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
+  // Get the other user in a connection
+  const getOtherUserInConnection = (connection: any) => {
+    if (!currentUser) return null;
+    const otherUserId =
+      connection.sourceId === currentUser.id
+        ? connection.targetId
+        : connection.sourceId;
+    return users.find((u) => u.id === otherUserId);
+  };
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -78,6 +117,123 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
         </div>
 
         <div className="mb-6">
+          {userConnections.length > 0 && (
+            <div className="mb-6">
+              <h4 className="font-medium mb-3">Your Active Connections</h4>
+              <div className="space-y-3">
+                {userConnections.map((connection) => {
+                  const otherUser = getOtherUserInConnection(connection);
+                  if (!otherUser) return null;
+
+                  return (
+                    <div
+                      key={connection.id}
+                      className="p-3 border rounded-lg bg-white dark:bg-gray-800"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center space-x-2">
+                          <User className="h-5 w-5 text-blue-500" />
+                          <span className="font-medium">{otherUser.name}</span>
+                          <span className="text-xs px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                            {connection.type}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleTestConnection(connection.id)}
+                          className="flex items-center space-x-1 text-sm px-2 py-1 rounded bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800 transition-colors"
+                          disabled={isTestingConnection}
+                        >
+                          {isTestingConnection &&
+                          activeConnection === connection.id ? (
+                            <>
+                              <Activity className="h-4 w-4 animate-pulse" />
+                              <span>Testing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="h-4 w-4" />
+                              <span>Test Connection</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      {connection.lastTest && (
+                        <div className="mt-3 pt-3 border-t">
+                          <div className="text-xs uppercase tracking-wider text-gray-500 mb-2">
+                            Last Test Results
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                            <div>
+                              <span className="block text-xs text-gray-500">
+                                Download
+                              </span>
+                              <span className="font-bold text-blue-600 dark:text-blue-400">
+                                {connection.lastTest.downloadSpeed.toFixed(2)}{" "}
+                                Mbps
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-xs text-gray-500">
+                                Upload
+                              </span>
+                              <span className="font-bold text-green-600 dark:text-green-400">
+                                {connection.lastTest.uploadSpeed.toFixed(2)}{" "}
+                                Mbps
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-xs text-gray-500">
+                                Latency
+                              </span>
+                              <span className="font-bold text-purple-600 dark:text-purple-400">
+                                {connection.lastTest.latency.toFixed(2)} ms
+                              </span>
+                            </div>
+                            <div>
+                              <span className="block text-xs text-gray-500">
+                                Packet Loss
+                              </span>
+                              <span className="font-bold text-red-600 dark:text-red-400">
+                                {connection.lastTest.packetLoss.toFixed(2)}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <div className="text-xs text-gray-500 mb-1">
+                              Connection Quality
+                            </div>
+                            <div className="relative h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                              <div
+                                className={`absolute top-0 left-0 h-full rounded-full ${getConnectionQualityColor(
+                                  connection.lastTest
+                                )}`}
+                                style={{
+                                  width: `${getConnectionQualityPercentage(
+                                    connection.lastTest
+                                  )}%`,
+                                }}
+                              ></div>
+                            </div>
+                            <div className="mt-1 text-xs font-medium text-right">
+                              {getConnectionQualityLabel(connection.lastTest)}
+                            </div>
+                          </div>
+                          <div className="mt-1 text-xs text-gray-500 text-right">
+                            Tested:{" "}
+                            {new Date(
+                              connection.lastTest.timestamp
+                            ).toLocaleString()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="mb-4">
             <label htmlFor="user-select" className="block mb-2 font-medium">
               Select User
@@ -101,28 +257,39 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
             )}
             {selectedUserMetrics && (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4 border border-blue-100 dark:border-blue-900">
-                <h3 className="text-lg font-semibold mb-2 text-blue-700 dark:text-blue-300">
-                  Router Network Metrics
-                </h3>
+                {/* Fast.com style UI for bandwidth */}
+                <div className="mb-4 text-center">
+                  <div className="text-xs uppercase tracking-wider text-gray-500 mb-1">
+                    Download Speed
+                  </div>
+                  <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                    {selectedUserMetrics.downloadSpeed}
+                    <span className="text-lg ml-1">Mbps</span>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className="block text-xs text-gray-500">
+                    <span className="block text-xs uppercase tracking-wider text-gray-500">
                       Upload Speed
                     </span>
-                    <span className="font-bold text-blue-600 dark:text-blue-400">
+                    <span className="font-bold text-green-600 dark:text-green-400">
                       {selectedUserMetrics.uploadSpeed} Mbps
                     </span>
                   </div>
                   <div>
-                    <span className="block text-xs text-gray-500">
-                      Download Speed
+                    <span className="block text-xs uppercase tracking-wider text-gray-500">
+                      Bandwidth
                     </span>
                     <span className="font-bold text-blue-600 dark:text-blue-400">
-                      {selectedUserMetrics.downloadSpeed} Mbps
+                      {selectedUserMetrics.maxBandwidth ||
+                        selectedUserMetrics.downloadSpeed +
+                          selectedUserMetrics.uploadSpeed}{" "}
+                      Mbps
                     </span>
                   </div>
                   <div>
-                    <span className="block text-xs text-gray-500">
+                    <span className="block text-xs uppercase tracking-wider text-gray-500">
                       Packet Loss
                     </span>
                     <span className="font-bold text-red-600 dark:text-red-400">
@@ -130,7 +297,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
                     </span>
                   </div>
                   <div>
-                    <span className="block text-xs text-gray-500">
+                    <span className="block text-xs uppercase tracking-wider text-gray-500">
                       Throughput
                     </span>
                     <span className="font-bold text-green-600 dark:text-green-400">
@@ -138,10 +305,44 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
                     </span>
                   </div>
                   <div>
-                    <span className="block text-xs text-gray-500">Latency</span>
+                    <span className="block text-xs uppercase tracking-wider text-gray-500">
+                      Latency
+                    </span>
                     <span className="font-bold text-purple-600 dark:text-purple-400">
                       {selectedUserMetrics.latency} ms
                     </span>
+                  </div>
+                  {selectedUserMetrics.jitter && (
+                    <div>
+                      <span className="block text-xs uppercase tracking-wider text-gray-500">
+                        Jitter
+                      </span>
+                      <span className="font-bold text-orange-600 dark:text-orange-400">
+                        {selectedUserMetrics.jitter} ms
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Connection quality indicator */}
+                <div className="mt-4">
+                  <div className="text-xs uppercase tracking-wider text-gray-500 mb-2">
+                    Connection Quality
+                  </div>
+                  <div className="relative h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className={`absolute top-0 left-0 h-full rounded-full ${getConnectionQualityColor(
+                        selectedUserMetrics
+                      )}`}
+                      style={{
+                        width: `${getConnectionQualityPercentage(
+                          selectedUserMetrics
+                        )}%`,
+                      }}
+                    ></div>
+                  </div>
+                  <div className="mt-1 text-xs font-medium text-right">
+                    {getConnectionQualityLabel(selectedUserMetrics)}
                   </div>
                 </div>
               </div>
@@ -250,6 +451,35 @@ const ConnectionTypeButton: React.FC<ConnectionTypeButtonProps> = ({
       <span className="text-sm font-medium">{type}</span>
     </div>
   );
+};
+
+// Helper functions for connection quality
+const getConnectionQualityPercentage = (metrics: any): number => {
+  // Calculate a quality score based on download speed, upload speed, and latency
+  const downloadScore = Math.min(metrics.downloadSpeed / 100, 1) * 40; // 40% weight
+  const uploadScore = Math.min(metrics.uploadSpeed / 50, 1) * 30; // 30% weight
+  const latencyScore =
+    Math.max(0, Math.min((200 - metrics.latency) / 200, 1)) * 30; // 30% weight
+
+  return Math.min(Math.round(downloadScore + uploadScore + latencyScore), 100);
+};
+
+const getConnectionQualityColor = (metrics: any): string => {
+  const quality = getConnectionQualityPercentage(metrics);
+  if (quality >= 80) return "bg-green-500";
+  if (quality >= 60) return "bg-blue-500";
+  if (quality >= 40) return "bg-yellow-500";
+  if (quality >= 20) return "bg-orange-500";
+  return "bg-red-500";
+};
+
+const getConnectionQualityLabel = (metrics: any): string => {
+  const quality = getConnectionQualityPercentage(metrics);
+  if (quality >= 80) return "Excellent";
+  if (quality >= 60) return "Good";
+  if (quality >= 40) return "Average";
+  if (quality >= 20) return "Poor";
+  return "Very Poor";
 };
 
 export default ConnectionModal;
