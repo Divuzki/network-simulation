@@ -16,7 +16,7 @@ FROM node:18-alpine AS production-image
 
 WORKDIR /app
 
-COPY ./server/package.json ./server/yarn.lock ./server/
+COPY ./server/package.json ./server/package-lock.json ./server/
 
 RUN cd server && npm ci --only=production
 
