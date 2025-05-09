@@ -9,8 +9,17 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve static files from the React app
+const path = require("path");
+app.use(express.static(path.join(__dirname, "../dist")));
+
 // Create HTTP server
 const server = http.createServer(app);
+
+// Serve React app for all other routes
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../dist/index.html"));
+});
 
 // Create Socket.IO server
 const io = new Server(server, {
@@ -516,7 +525,7 @@ function parseArpOutput(output) {
 }
 
 // Start the server
-const PORT = process.env.PORT || 3002; // Default to 3002 if no env var
+const PORT = process.env.PORT || 3003; // Default to 3003 if no env var
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server listening on http://0.0.0.0:${PORT}`);
 });

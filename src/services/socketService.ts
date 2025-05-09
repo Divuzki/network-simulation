@@ -1,4 +1,4 @@
-import { io, Socket } from 'socket.io-client';
+import { io, Socket } from "socket.io-client";
 
 // Store for callbacks
 const mockCallbacks: Record<string, Function> = {};
@@ -6,8 +6,10 @@ const mockCallbacks: Record<string, Function> = {};
 // Initialize Socket.io connection
 export const setupSocket = (): Socket => {
   // Connect to the real backend
-  const socket = io("http://192.168.1.173:3002");
-  
+  // Use environment variable for socket URL, defaulting to localhost for development
+  const socketUrl = import.meta.env.VITE_SOCKET_URL || "http://localhost:3003";
+  const socket = io(socketUrl);
+
   return socket;
 };
 
