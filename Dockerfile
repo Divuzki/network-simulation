@@ -1,6 +1,5 @@
 FROM node:18-alpine AS frontend-builder
 
-# Set the working directory in the container
 WORKDIR /app
 
 COPY package.json package-lock.json ./
