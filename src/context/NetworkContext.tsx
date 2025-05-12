@@ -119,7 +119,7 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         const uniqueDevices = [...prev];
         updatedDevices.forEach((device) => {
           const existingIndex = uniqueDevices.findIndex(
-            (d) => d.id === device.id
+            (d) => d.name === device.name
           );
           if (existingIndex >= 0) {
             // Update existing device

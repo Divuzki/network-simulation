@@ -234,12 +234,13 @@ app.post("/api/scan", (req, res) => {
     const newDevices = parseArpOutput(stdout);
     // Remove duplicates from global devices array by IP
     for (const device of newDevices) {
-      const existingIdx = devices.findIndex((d) => d.ip === device.ip);
+      // console.log(newDevices);
+      const existingIdx = devices.findIndex((d) => d.name === device.name);
       if (existingIdx === -1) {
         devices.push(device);
       } else {
         // Optionally update the device info if needed
-        devices[existingIdx] = { ...devices[existingIdx], ...device };
+        // devices[existingIdx] = { ...devices[existingIdx], ...device };
       }
     }
     // Notify all clients
@@ -292,10 +293,32 @@ app.post("/api/connect", (req, res) => {
   const { userId, connectionType } = req.body;
   const sourceId = req.body.sourceId || "user-1"; // Default for demo
 
-  // Helper to get user network (assume user has 'network' property, e.g., subnet or router IP)
-  function getUserNetwork(userId) {
+  // Helper to get user network information (IP address and connection type)
+  function getUserNetworkInfo(userId) {
     const user = users.find((u) => u.id === userId);
-    return user && user.network ? user.network : null;
+    if (!user) return null;
+
+    // Check if user has a device associated with them
+    const userDevice = devices.find((d) => d.id === userId);
+
+    // If user has a device, use its IP address
+    const ipAddress = userDevice ? userDevice.ip : null;
+
+    // Extract subnet from IP (e.g., 192.168.1.x -> 192.168.1)
+    const subnet = ipAddress
+      ? ipAddress.split(".").slice(0, 3).join(".")
+      : null;
+
+    // Check if connection is via ethernet
+    const isEthernet = userDevice ? userDevice.isEthernet === true : false;
+
+    return {
+      subnet,
+      ipAddress,
+      isEthernet,
+      // Keep the original network property for backward compatibility
+      network: user.network || null,
+    };
   }
 
   // Check if connection is allowed based on network model rules
@@ -321,14 +344,40 @@ app.post("/api/connect", (req, res) => {
     }
   }
 
-  // LAN connections: only allow if both users are on the same network
+  // LAN connections: only allow if both users are on the same network (same subnet) or connected via ethernet
   if (connectionType === "LAN") {
-    const sourceNetwork = getUserNetwork(sourceId);
-    const targetNetwork = getUserNetwork(userId);
-    if (!sourceNetwork || !targetNetwork || sourceNetwork !== targetNetwork) {
+    const sourceNetworkInfo = getUserNetworkInfo(sourceId);
+    const targetNetworkInfo = getUserNetworkInfo(userId);
+
+    // Check if we have network information for both users
+    if (!sourceNetworkInfo || !targetNetworkInfo) {
+      return res.status(400).json({
+        error: "Cannot determine network information for one or both users",
+      });
+    }
+
+    // Check if users are on the same subnet
+    const sameSubnet =
+      sourceNetworkInfo.subnet &&
+      targetNetworkInfo.subnet &&
+      sourceNetworkInfo.subnet === targetNetworkInfo.subnet;
+
+    // Check if both users are connected via ethernet
+    const bothEthernet =
+      sourceNetworkInfo.isEthernet && targetNetworkInfo.isEthernet;
+
+    // Check if users have the same network property (backward compatibility)
+    const sameNetworkProperty =
+      sourceNetworkInfo.network &&
+      targetNetworkInfo.network &&
+      sourceNetworkInfo.network === targetNetworkInfo.network;
+
+    // Allow LAN connection only if users are on the same subnet OR both connected via ethernet
+    // The sameNetworkProperty check is kept for backward compatibility but the primary logic is sameSubnet OR bothEthernet
+    if (!(sameSubnet || bothEthernet) && !sameNetworkProperty) {
       return res.status(400).json({
         error:
-          "LAN connections are only allowed between users on the same network",
+          "LAN connections are only allowed between users on the same subnet or if both are connected via Ethernet.",
       });
     }
   }
@@ -387,19 +436,19 @@ io.on("connection", (socket) => {
 
   // Handle user registration
   socket.on("register-user", (userData) => {
+    console.log("User Data: ", userData);
     // Use a unique identifier for the user (e.g., userData.id or userData.name)
     if (userData && !userData.name) return;
     let userId = userData.id || `user-${Date.now()}`;
     // Check if a user with the same name or id is already connected (regardless of device name)
-    let existingUser = users.find(
-      (u) => u.id === userId || u.name === userData.name
-    );
+    let existingUser = users.find((u) => u.name === userData.name);
     let user;
+    console.log(existingUser);
     if (existingUser) {
       // Prevent duplicate user registration (even if device name is different)
       user = { ...existingUser, status: "online" };
       // Update user in users array
-      const idx = users.findIndex((u) => u.id === user.id);
+      const idx = users.findIndex((u) => u.name === user.name);
       users[idx] = user;
       userId = user.id;
     } else {
@@ -457,43 +506,58 @@ function parseArpOutput(output) {
   const lines = output.split("\n");
   const newDevices = [];
   for (const line of lines) {
-    // Match IP and MAC addresses in arp output, and extract hostname/SSID
     // Example: divines-mbp (192.168.1.173) at a4:83:e7:68:e2:30 on en0 ifscope permanent [ethernet]
     // Example router: MyRouterSSID (192.168.1.1) at 00:1a:2b:3c:4d:5e on en0 ifscope [ethernet]
-    const match = line.match(/^([\w\-]+) \(([0-9.]+)\) at ([0-9a-f:]+)/i);
+    // Updated regex to capture interface and check for [ethernet]
+    const ethMatch = line.match(
+      /^([\w\-]+(?:\.[\w\-]+)*) \(([0-9.]+)\) at ([0-9a-f:]+) on (\w+) ifscope(?: \w+)? \[ethernet\]/i
+    );
+    const generalMatch = line.match(
+      /^([\w\-]+(?:\.[\w\-]+)*) \(([0-9.]+)\) at ([0-9a-f:]+)/i // Fallback for non-ethernet or different formats
+    );
+
+    const match = ethMatch || generalMatch;
+
     if (match) {
       const hostnameOrSSID = match[1];
       const ip = match[2];
       const mac = match[3];
-      let type = "computer";
+      const isEthernet = ethMatch ? true : false; // Check if it was the ethernet-specific match
+
+      let type = "computer"; // Default type
       let name = hostnameOrSSID;
-      // Try to detect OS name from the hostname if possible
-      // e.g., "iPhone", "android", "windows", "macbook", etc.
+
+      // OS detection (simplified)
       const osNameMatch = hostnameOrSSID.match(
-        /(iphone|android|windows|macbook|mac|ipad|linux|ubuntu|pixel|galaxy|samsung|xiaomi|huawei|oneplus|ipad|surface)/i
+        /(iphone|android|windows|macbook|mac|ipad|linux|ubuntu|pixel|galaxy|samsung|xiaomi|huawei|oneplus|surface)/i
       );
       if (osNameMatch) {
-        name = osNameMatch[0];
+        name = osNameMatch[0]; // Use detected OS name
       }
-      // Heuristic: if IP is typical router IP, treat as router and use SSID as name
-      if (ip.startsWith("192.168.1.1") || ip.startsWith("10.0.0.1")) {
+
+      // Device type heuristics
+      if (ip.endsWith(".1")) {
+        // Simplified router detection
         type = "router";
         name = hostnameOrSSID; // SSID for router
+      } else if (isEthernet) {
+        type = "computer"; // Assume wired connections are computers/servers unless other heuristics apply
       } else if (
-        mac.toLowerCase().startsWith("a8:") ||
+        mac.toLowerCase().startsWith("a8:") || // Common MAC prefixes for smartphones
         mac.toLowerCase().startsWith("ac:")
       ) {
         type = "smartphone";
       }
+
       // Avoid duplicates by IP address
       if (!newDevices.some((d) => d.ip === ip)) {
-        console.log(name);
         newDevices.push({
           id: `device-${Date.now()}-${newDevices.length}`,
           name,
           ip,
           mac,
           type,
+          isEthernet, // Store ethernet status
           status: "online",
         });
       }
@@ -537,6 +601,6 @@ function parseArpOutput(output) {
 
 // Start server
 const PORT = process.env.PORT || 3003;
-server.listen(PORT, () => {
+server.listen(PORT, "192.168.1.173", () => {
   console.log(`Server running on port ${PORT}`);
 });
