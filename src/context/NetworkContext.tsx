@@ -48,6 +48,35 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
+  useEffect(() => {
+    // Initialize socket connection
+    const socket = setupSocket();
+
+    // Get device name to use as username
+    getDevices()
+      .then((response) => {
+        // Find this device or use a default name
+        const thisDevice =
+          response.data.find((d) => d.type === "computer") || response.data[0];
+        const deviceName = thisDevice && thisDevice.name;
+
+        // Create user with device name
+        const defaultUser: User = {
+          id: `user-${Date.now()}`,
+          name: deviceName ?? null,
+          status: "online",
+        };
+
+        if (defaultUser.name) {
+          // Register with the server
+          socket.emit("register-user", defaultUser);
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching devices:", error);
+      });
+    }, [devices])
+
   // Initialize with real data from the backend
   useEffect(() => {
     // Initialize socket connection
@@ -59,19 +88,19 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         // Find this device or use a default name
         const thisDevice =
           response.data.find((d) => d.type === "computer") || response.data[0];
-        const deviceName = thisDevice
-          ? thisDevice.name
-          : `Device-${Date.now()}`;
+        const deviceName = thisDevice && thisDevice.name;
 
         // Create user with device name
         const defaultUser: User = {
           id: `user-${Date.now()}`,
-          name: deviceName,
+          name: deviceName ?? null,
           status: "online",
         };
 
-        // Register with the server
-        socket.emit("register-user", defaultUser);
+        if (defaultUser.name) {
+          // Register with the server
+          socket.emit("register-user", defaultUser);
+        }
       })
       .catch((error) => {
         console.error("Error fetching devices:", error);

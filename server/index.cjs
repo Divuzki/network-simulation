@@ -388,6 +388,7 @@ io.on("connection", (socket) => {
   // Handle user registration
   socket.on("register-user", (userData) => {
     // Use a unique identifier for the user (e.g., userData.id or userData.name)
+    if (userData && !userData.name) return;
     let userId = userData.id || `user-${Date.now()}`;
     // Check if a user with the same name or id is already connected (regardless of device name)
     let existingUser = users.find(
@@ -451,30 +452,6 @@ io.on("connection", (socket) => {
   socket.emit("connection-update", connections);
 });
 
-// Utility functions
-function simulateDevices() {
-  const numDevices = Math.floor(Math.random() * 3) + 1; // 1-3 devices
-  const newDevices = [];
-
-  for (let i = 0; i < numDevices; i++) {
-    const deviceTypes = ["computer", "router", "smartphone"];
-    const type = deviceTypes[Math.floor(Math.random() * deviceTypes.length)];
-
-    newDevices.push({
-      id: `device-${Date.now()}-${i}`,
-      name: `${type}-${Math.floor(Math.random() * 100)}`,
-      ip: `192.168.1.${Math.floor(Math.random() * 255)}`,
-      mac: `00:1A:2B:${Math.floor(Math.random() * 100)}:${Math.floor(
-        Math.random() * 100
-      )}:${Math.floor(Math.random() * 100)}`,
-      type,
-      status: "online",
-    });
-  }
-
-  return newDevices;
-}
-
 // Add this function to parse arp -a output
 function parseArpOutput(output) {
   const lines = output.split("\n");
@@ -510,6 +487,7 @@ function parseArpOutput(output) {
       }
       // Avoid duplicates by IP address
       if (!newDevices.some((d) => d.ip === ip)) {
+        console.log(name);
         newDevices.push({
           id: `device-${Date.now()}-${newDevices.length}`,
           name,
@@ -525,10 +503,10 @@ function parseArpOutput(output) {
 }
 
 // Start the server
-const PORT = process.env.PORT || 3003; // Default to 3003 if no env var
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server listening on http://0.0.0.0:${PORT}`);
-});
+// const PORT = process.env.PORT || 3003; // Default to 3003 if no env var
+// server.listen(PORT, "0.0.0.0", () => {
+//   console.log(`Server listening on http://0.0.0.0:${PORT}`);
+// });
 
 // You can also uncomment and rename the parseArpScanOutput function if you prefer
 // function parseArpOutput(output) {
@@ -558,7 +536,7 @@ server.listen(PORT, "0.0.0.0", () => {
 // }
 
 // Start server
-// const PORT = process.env.PORT || 3002;
-// server.listen(PORT, "192.168.1.173", () => {
-//   console.log(`Server running on port ${PORT}`);
-// });
+const PORT = process.env.PORT || 3003;
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
