@@ -108,7 +108,15 @@ async function getRealNetworkMetrics(entityId) {
   }
 
   try {
-    const pingCommand = `ping -c 4 -t 5 ${pingTarget}`;
+    const os = require("os");
+    let pingCommand;
+    if (os.platform() === "win32") {
+      // Windows: -n for count, -w for timeout in ms
+      pingCommand = `ping -n 4 -w 5000 ${pingTarget}`;
+    } else {
+      // Unix: -c for count, -t for timeout in seconds
+      pingCommand = `ping -c 4 -t 5 ${pingTarget}`;
+    }
     const { stdout: pingOut, stderr: pingErr } = await execAsync(pingCommand);
 
     if (pingErr && pingErr.trim() !== "") {
@@ -225,7 +233,14 @@ app.post("/api/connections/:connectionId/test", async (req, res) => {
 
 app.post("/api/scan", (req, res) => {
   // Use arp-scan to get actual network devices
-  exec("arp -a", (error, stdout) => {
+  const os = require("os");
+  let arpCommand;
+  if (os.platform() === "win32") {
+    arpCommand = "arp -a";
+  } else {
+    arpCommand = "arp -a";
+  }
+  exec(arpCommand, (error, stdout) => {
     if (error) {
       console.error("Scan error:", error);
       return res.status(500).json({ error: "Scan failed" });
@@ -503,7 +518,8 @@ io.on("connection", (socket) => {
 
 // Add this function to parse arp -a output
 function parseArpOutput(output) {
-  const lines = output.split("\n");
+  const os = require("os");
+  const lines = output.split(os.platform() === "win32" ? "\r\n" : "\n");
   const newDevices = [];
   for (const line of lines) {
     // Example: divines-mbp (192.168.1.173) at a4:83:e7:68:e2:30 on en0 ifscope permanent [ethernet]
