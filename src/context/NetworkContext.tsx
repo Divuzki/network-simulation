@@ -17,6 +17,7 @@ import {
   disconnectFromUser,
   testConnectionBetweenUsers,
 } from "../services/apiService";
+import axios from "axios";
 
 interface NetworkContextType {
   devices: Device[];
@@ -48,35 +49,6 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
   const [isScanning, setIsScanning] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  useEffect(() => {
-    // Initialize socket connection
-    const socket = setupSocket();
-
-    // Get device name to use as username
-    getDevices()
-      .then((response) => {
-        // Find this device or use a default name
-        const thisDevice =
-          response.data.find((d) => d.type === "computer") || response.data[0];
-        const deviceName = thisDevice && thisDevice.name;
-
-        // Create user with device name
-        const defaultUser: User = {
-          id: `user-${Date.now()}`,
-          name: deviceName ?? null,
-          status: "online",
-        };
-
-        if (defaultUser.name) {
-          // Register with the server
-          socket.emit("register-user", defaultUser);
-        }
-      })
-      .catch((error) => {
-        console.error("Error fetching devices:", error);
-      });
-    }, [devices])
-
   // Initialize with real data from the backend
   useEffect(() => {
     // Initialize socket connection
@@ -104,6 +76,11 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
       })
       .catch((error) => {
         console.error("Error fetching devices:", error);
+        if (axios.isAxiosError(error)) {
+          toast.error(`Failed to fetch devices: ${error.message}`);
+        } else {
+          toast.error("Failed to fetch devices");
+        }
       });
 
     // Handle successful registration
@@ -114,7 +91,6 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
 
     // Socket event handlers
     socket.on("device-update", (updatedDevices: Device[]) => {
-      // Properly merge devices to avoid duplicates
       setDevices((prev) => {
         const uniqueDevices = [...prev];
         updatedDevices.forEach((device) => {
@@ -122,10 +98,8 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
             (d) => d.name === device.name
           );
           if (existingIndex >= 0) {
-            // Update existing device
             uniqueDevices[existingIndex] = { ...device };
           } else {
-            // Add new device
             uniqueDevices.push(device);
           }
         });
@@ -145,36 +119,33 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
       setUsers(updatedUsers);
     });
 
-    // Fetch initial data
-    getDevices()
-      .then((response) => {
-        setDevices(response.data);
-      })
-      .catch((error) => {
-        console.error("Error fetching devices:", error);
-      });
+    // Fetch initial data with better error handling
+    const fetchInitialData = async () => {
+      try {
+        const [devicesResponse, usersResponse] = await Promise.all([
+          getDevices(),
+          getUsers()
+        ]);
 
-    // Fetch connected users
-    getUsers()
-      .then((response) => {
-        setUsers(response.data);
-      })
-      .catch((error) => {
-        console.error("Error fetching users:", error);
-      });
-
-    // Fetch network metrics for all users and merge into user objects
-    getUsers()
-      .then((response) => {
-        const usersWithMetrics = response.data.map((u: any) => ({
+        setDevices(devicesResponse.data);
+        
+        const usersWithMetrics = usersResponse.data.map((u: any) => ({
           ...u,
           networkMetrics: u.networkMetrics || null,
         }));
         setUsers(usersWithMetrics);
-      })
-      .catch((error) => {
-        console.error("Error fetching user metrics:", error);
-      });
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          console.error("Network error:", error.message);
+          toast.error(`Failed to fetch data: ${error.message}`);
+        } else {
+          console.error("Error fetching data:", error);
+          toast.error("Failed to fetch initial data");
+        }
+      }
+    };
+
+    fetchInitialData();
 
     return () => {
       socket.disconnect();
@@ -185,12 +156,15 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
   const handleScanNetwork = useCallback(async () => {
     setIsScanning(true);
     try {
-      // Call the real backend API
       const response = await scanNetwork();
       toast.success("Network scan completed");
     } catch (error) {
       console.error("Error scanning network:", error);
-      toast.error("Failed to scan network");
+      if (axios.isAxiosError(error)) {
+        toast.error(`Scan failed: ${error.message}`);
+      } else {
+        toast.error("Failed to scan network");
+      }
     } finally {
       setIsScanning(false);
     }
@@ -201,9 +175,7 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
     (userId: string, connectionType: "P2P" | "LAN" | "WAN"): boolean => {
       if (!currentUser) return false;
 
-      // For P2P connections, check if either user already has a P2P connection
       if (connectionType === "P2P") {
-        // Count existing P2P connections for both users
         const sourceP2PConnections = connections.filter(
           (conn) =>
             conn.type === "P2P" &&
@@ -217,7 +189,6 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
             (conn.sourceId === userId || conn.targetId === userId)
         );
 
-        // P2P connections are limited to 2 users only (1-to-1)
         if (
           sourceP2PConnections.length > 0 ||
           targetP2PConnections.length > 0
@@ -226,7 +197,6 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         }
       }
 
-      // For LAN connections, only allow if both users are on the same network
       if (connectionType === "LAN") {
         const sourceUser = users.find((u) => u.id === currentUser.id);
         const targetUser = users.find((u) => u.id === userId);
@@ -241,7 +211,6 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         }
       }
 
-      // Check if connection already exists between these users
       const existingConnection = connections.find(
         (conn) =>
           (conn.sourceId === currentUser.id && conn.targetId === userId) ||
@@ -261,7 +230,6 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         return;
       }
 
-      // Check if connection is allowed based on network model rules
       if (!canConnectToUser(userId, connectionType)) {
         if (connectionType === "P2P") {
           toast.error("P2P connections are limited to 2 users only");
@@ -272,7 +240,6 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       try {
-        // Call the real backend API
         const response = await connectToUser(
           userId,
           connectionType,
@@ -281,12 +248,7 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         toast.success(`Connected to user via ${connectionType}`);
       } catch (error) {
         console.error("Error connecting to user:", error);
-        // Display specific error message from server if available
-        if (
-          error.response &&
-          error.response.data &&
-          error.response.data.error
-        ) {
+        if (axios.isAxiosError(error) && error.response?.data?.error) {
           toast.error(error.response.data.error);
         } else {
           toast.error("Failed to connect to user");
@@ -299,12 +261,15 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
   // Disconnect from user function
   const handleDisconnectFromUser = useCallback(async (connectionId: string) => {
     try {
-      // Call the real backend API
       await disconnectFromUser(connectionId);
       toast.info("Disconnected from user");
     } catch (error) {
       console.error("Error disconnecting from user:", error);
-      toast.error("Failed to disconnect from user");
+      if (axios.isAxiosError(error)) {
+        toast.error(`Failed to disconnect: ${error.message}`);
+      } else {
+        toast.error("Failed to disconnect from user");
+      }
     }
   }, []);
 
@@ -315,7 +280,11 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         await testConnectionBetweenUsers(connectionId);
       } catch (error) {
         console.error("Error testing connection:", error);
-        toast.error("Failed to test connection");
+        if (axios.isAxiosError(error)) {
+          toast.error(`Connection test failed: ${error.message}`);
+        } else {
+          toast.error("Failed to test connection");
+        }
       }
     },
     []
