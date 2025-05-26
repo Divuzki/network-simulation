@@ -3,6 +3,7 @@ const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const { exec } = require("child_process");
+const OpenAI = require('openai');
 
 // Create Express app
 const app = express();
@@ -16,17 +17,17 @@ app.use(express.static(path.join(__dirname, "../dist")));
 // Create HTTP server
 const server = http.createServer(app);
 
-// Serve React app for all other routes
-// app.get("*", (req, res) => {
-//   res.sendFile(path.join(__dirname, "../dist/index.html"));
-// });
-
 // Create Socket.IO server
 const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"],
   },
+});
+
+// Initialize OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 // In-memory storage for demonstration
@@ -45,6 +46,32 @@ const speedTestCache = {
   timestamp: 0,
   ttl: 5 * 60 * 1000, // 5 minutes TTL
 };
+
+// Chatbot endpoint
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant specializing in computer networking, network visualization, and network topology. You help users understand network concepts and how to use the network visualization application."
+        },
+        {
+          role: "user",
+          content: message
+        }
+      ],
+    });
+
+    res.json({ response: completion.choices[0].message.content });
+  } catch (error) {
+    console.error('OpenAI API error:', error);
+    res.status(500).json({ error: 'Failed to get response from AI' });
+  }
+});
 
 async function getRealNetworkMetrics(entityId) {
   // Renamed userId to entityId for clarity

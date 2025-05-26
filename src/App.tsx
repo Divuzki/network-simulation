@@ -6,6 +6,7 @@ import Header from './components/Header';
 import NetworkGraph from './components/NetworkGraph';
 import DeviceList from './components/DeviceList';
 import ScanButton from './components/ScanButton';
+import Chatbot from './components/Chatbot';
 import PermissionModal from './components/modals/PermissionModal';
 import ConnectionModal from './components/modals/ConnectionModal';
 import EducationalModal from './components/modals/EducationalModal';
@@ -18,7 +19,6 @@ function App() {
   const [showEducationalModal, setShowEducationalModal] = useState(false);
   const [currentTopic, setCurrentTopic] = useState('');
 
-  // Show the educational modal on first visit
   useEffect(() => {
     const hasVisited = localStorage.getItem('hasVisited');
     if (!hasVisited) {
@@ -53,6 +53,8 @@ function App() {
               </div>
             </main>
           </div>
+          
+          <Chatbot />
           
           {showPermissionModal && (
             <PermissionModal 
