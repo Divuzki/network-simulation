@@ -582,41 +582,8 @@ function parseArpOutput(output) {
   return newDevices;
 }
 
-// Start the server
-// const PORT = process.env.PORT || 3003; // Default to 3003 if no env var
-// server.listen(PORT, "0.0.0.0", () => {
-//   console.log(`Server listening on http://0.0.0.0:${PORT}`);
-// });
-
-// You can also uncomment and rename the parseArpScanOutput function if you prefer
-// function parseArpOutput(output) {
-//   const lines = output.split('\n');
-//   const devices = [];
-//
-//   for (const line of lines) {
-//     if (line.includes('192.168.') || line.includes('10.0.')) {
-//       const parts = line.split('\t');
-//       if (parts.length >= 2) {
-//         const ip = parts[0].trim();
-//         const mac = parts[1].trim();
-//
-//         devices.push({
-//           id: `device-${Date.now()}-${devices.length}`,
-//           name: `Device-${devices.length + 1}`,
-//           ip,
-//           mac,
-//           type: 'other',
-//           status: 'online'
-//         });
-//       }
-//     }
-//   }
-//
-//   return devices;
-// }
-
 // Start server
 const PORT = process.env.PORT || 3003;
-server.listen(PORT, "192.168.1.173", () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
 });
