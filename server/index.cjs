@@ -3,7 +3,7 @@ const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const { exec } = require("child_process");
-const OpenAI = require('openai');
+const OpenAI = require("openai");
 
 // Create Express app
 const app = express();
@@ -25,10 +25,23 @@ const io = new Server(server, {
   },
 });
 
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Simple AI chatbot responses
+const chatbotResponses = {
+  help: "I can help you understand network concepts and how to use this network visualization application. Try asking about network topology, connections, or how to use specific features.",
+  network:
+    "A network is a collection of computers, servers, and other devices that are connected together to share resources and communicate. This application helps you visualize and understand network topologies.",
+  topology:
+    "Network topology refers to the arrangement of elements in a network. Common topologies include star, mesh, bus, and ring. This application allows you to visualize different network topologies.",
+  connection:
+    "Connections represent how devices communicate with each other. In this application, you can create different types of connections like LAN or P2P between devices.",
+  p2p: "P2P (Peer-to-Peer) is a network model where computers can communicate directly without a central server. In this application, P2P connections are limited to 1-to-1 connections.",
+  lan: "LAN (Local Area Network) connects computers in a limited area like a home, office, or building. In this application, LAN connections require devices to be on the same subnet or both connected via Ethernet.",
+  scan: "The scan feature discovers devices on your local network. Click the 'Scan Network' button to find devices connected to your network.",
+  metrics:
+    "Network metrics include upload/download speed, latency, packet loss, and throughput. These metrics help you understand the performance of your network connections.",
+  default:
+    "I'm a simple network assistant. I can help with basic network concepts and how to use this application. Try asking about network topology, connections, or specific features.",
+};
 
 // In-memory storage for demonstration
 const devices = [];
@@ -48,28 +61,29 @@ const speedTestCache = {
 };
 
 // Chatbot endpoint
-app.post('/api/chat', async (req, res) => {
+app.post("/api/chat", async (req, res) => {
   try {
     const { message } = req.body;
-    
+
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant specializing in computer networking, network visualization, and network topology. You help users understand network concepts and how to use the network visualization application."
+          content:
+            "You are a helpful assistant specializing in computer networking, network visualization, and network topology. You help users understand network concepts and how to use the network visualization application.",
         },
         {
           role: "user",
-          content: message
-        }
+          content: message,
+        },
       ],
     });
 
     res.json({ response: completion.choices[0].message.content });
   } catch (error) {
-    console.error('OpenAI API error:', error);
-    res.status(500).json({ error: 'Failed to get response from AI' });
+    console.error("OpenAI API error:", error);
+    res.status(500).json({ error: "Failed to get response from AI" });
   }
 });
 
