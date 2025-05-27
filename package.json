@@ -19,8 +19,7 @@
     "vis-network": "^9.1.9",
     "socket.io-client": "^4.7.4",
     "axios": "^1.6.7",
-    "react-toastify": "^10.0.4",
-    "openai": "^4.28.0"
+    "react-toastify": "^10.0.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
