@@ -1,12 +1,12 @@
 # Network Visualization Application
 
-This application provides a real-time network visualization tool that scans for devices on your local network and visualizes them in an interactive graph. It also supports user-to-user connections with different connection types (P2P, LAN, WAN).
+This application provides a real-time network visualization tool that scans for devices on your local network and visualizes them in an interactive graph. It also supports device-to-device connections with different connection types (P2P, LAN, WAN).
 
 ## Features
 
 - Real-time network scanning to detect connected devices
 - Interactive network graph visualization using Vis.js
-- User-to-user connection functionality
+- Device-to-device connection functionality
 - Educational content about networking concepts
 - Dark/light mode toggle
 - Responsive design for all device sizes

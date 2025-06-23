@@ -32,8 +32,8 @@ describe('Network Visualization Server Tests', () => {
     });
   });
 
-  describe('User Connections', () => {
-    test('POST /api/connect should allow LAN connections for users on same network', async () => {
+  describe('Device Connections', () => {
+    test('POST /api/connect should allow LAN connections for devices on same network', async () => {
       const response = await request(app)
         .post('/api/connect')
         .send({

@@ -197,12 +197,12 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
         };
       case "user-connection":
         return {
-          title: "User Connections",
+          title: "Device Connections",
           icon: <Users className="h-6 w-6 text-indigo-500" />,
           content: (
             <>
               <p className="mb-4">
-                Users can connect to each other through different types of
+                Devices can connect to each other through different types of
                 network connections, depending on their physical location and
                 network infrastructure.
               </p>
@@ -212,7 +212,7 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
                   <span className="connection-p2p font-medium">
                     P2P (Peer-to-Peer)
                   </span>
-                  : Direct connection between users without an intermediary.
+                  : Direct connection between devices without an intermediary.
                   Ideal for direct communication and file sharing.
                 </li>
                 <li className="mb-2">
@@ -220,7 +220,7 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
                     LAN (Local Area Network)
                   </span>
                   : Connection through a wired local network. Provides high
-                  speed and reliability when users are on the same network.
+                  speed and reliability when devices are on the same network.
                 </li>
                 <li>
                   <span className="connection-wan font-medium">

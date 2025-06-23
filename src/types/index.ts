@@ -6,6 +6,8 @@ export interface Device {
   mac: string;
   type: "computer" | "router" | "smartphone" | "other";
   status: "online" | "offline" | "unknown";
+  isEthernet?: boolean;
+  isWebsiteUser?: boolean;
 }
 
 // User object representation

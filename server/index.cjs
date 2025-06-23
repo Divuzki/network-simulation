@@ -38,6 +38,7 @@ const chatbotResponses = {
   scan: "The scan feature discovers devices on your local network. Click the 'Scan Network' button to find devices connected to your network.",
   metrics:
     "Network metrics include upload/download speed, latency, packet loss, and throughput. These metrics help you understand the performance of your network connections.",
+    wan: "WAN (Wide Area Network) connects networks that are geographically far away. This application supports visualization of WAN connections.",
   default:
     "I'm a simple network assistant. I can help with basic network concepts and how to use this application. Try asking about network topology, connections, or specific features.",
 };
@@ -212,7 +213,7 @@ async function getRealNetworkMetrics(entityId) {
 
 // API endpoints
 
-// Test connection speed between two connected users
+// Test connection speed between two connected devices
 app.post("/api/connections/:connectionId/test", async (req, res) => {
   const { connectionId } = req.params;
 
@@ -223,13 +224,13 @@ app.post("/api/connections/:connectionId/test", async (req, res) => {
   }
 
   try {
-    // Get metrics for both users in the connection
+    // Get metrics for both devices in the connection
     const sourceMetrics = await getRealNetworkMetrics(connection.sourceId);
     const targetMetrics = await getRealNetworkMetrics(connection.targetId);
 
-    // Calculate connection quality between the two users
+    // Calculate connection quality between the two devices
     const connectionMetrics = {
-      // Average of both users' metrics
+      // Average of both devices' metrics
       uploadSpeed:
         ((parseFloat(sourceMetrics.uploadSpeed) || 0) +
           (parseFloat(targetMetrics.uploadSpeed) || 0)) /
@@ -283,15 +284,38 @@ app.post("/api/scan", (req, res) => {
     }
     // Parse arp -a output
     const newDevices = parseArpOutput(stdout);
-    // Remove duplicates from global devices array by IP
+    
+    // Add connected website users as devices if they're not already detected
+    const onlineUsers = users.filter(u => u.status === 'online');
+    for (const user of onlineUsers) {
+      // Check if this user is already in the scanned devices (by name)
+      const existingDevice = newDevices.find(d => d.name === user.name);
+      if (!existingDevice) {
+        // Add the connected user as a device
+        newDevices.push({
+          id: `device-user-${user.id}`,
+          name: user.name,
+          ip: 'Connected to Website', // Placeholder since we don't have their IP
+          mac: 'N/A',
+          type: 'computer',
+          isEthernet: false,
+          status: 'online',
+          isWebsiteUser: true // Flag to identify website-connected users
+        });
+      } else {
+        // Mark existing device as a website user
+        existingDevice.isWebsiteUser = true;
+      }
+    }
+    
+    // Remove duplicates from global devices array by name
     for (const device of newDevices) {
-      // console.log(newDevices);
       const existingIdx = devices.findIndex((d) => d.name === device.name);
       if (existingIdx === -1) {
         devices.push(device);
       } else {
-        // Optionally update the device info if needed
-        // devices[existingIdx] = { ...devices[existingIdx], ...device };
+        // Update the device info, preserving website user flag
+        devices[existingIdx] = { ...devices[existingIdx], ...device };
       }
     }
     // Notify all clients
@@ -316,7 +340,7 @@ app.get("/api/devices/:deviceId/metrics", async (req, res) => {
 });
 
 app.get("/api/users", async (req, res) => {
-  // Attach real network metrics to each user
+  // Attach real network metrics to each device (user represents a device connecting to the website)
   const usersWithMetrics = await Promise.all(
     users.map(async (u) => {
       let metrics = null;
@@ -344,15 +368,15 @@ app.post("/api/connect", (req, res) => {
   const { userId, connectionType } = req.body;
   const sourceId = req.body.sourceId || "user-1"; // Default for demo
 
-  // Helper to get user network information (IP address and connection type)
+  // Helper to get device network information (IP address and connection type)
   function getUserNetworkInfo(userId) {
     const user = users.find((u) => u.id === userId);
     if (!user) return null;
 
-    // Check if user has a device associated with them
+    // Check if user (device) has a network device associated with them
     const userDevice = devices.find((d) => d.id === userId);
 
-    // If user has a device, use its IP address
+    // If user (device) has a network device, use its IP address
     const ipAddress = userDevice ? userDevice.ip : null;
 
     // Extract subnet from IP (e.g., 192.168.1.x -> 192.168.1)
@@ -374,7 +398,7 @@ app.post("/api/connect", (req, res) => {
 
   // Check if connection is allowed based on network model rules
   if (connectionType === "P2P") {
-    // For P2P connections, check if either user already has a P2P connection
+    // For P2P connections, check if either device already has a P2P connection
     const sourceP2PConnections = connections.filter(
       (conn) =>
         conn.type === "P2P" &&
@@ -387,53 +411,53 @@ app.post("/api/connect", (req, res) => {
         (conn.sourceId === userId || conn.targetId === userId)
     );
 
-    // P2P connections are limited to 2 users only (1-to-1)
+    // P2P connections are limited to 2 devices only (1-to-1)
     if (sourceP2PConnections.length > 0 || targetP2PConnections.length > 0) {
       return res
         .status(400)
-        .json({ error: "P2P connections are limited to 2 users only" });
+        .json({ error: "P2P connections are limited to 2 devices only" });
     }
   }
 
-  // LAN connections: only allow if both users are on the same network (same subnet) or connected via ethernet
+  // LAN connections: only allow if both devices are on the same network (same subnet) or connected via ethernet
   if (connectionType === "LAN") {
     const sourceNetworkInfo = getUserNetworkInfo(sourceId);
     const targetNetworkInfo = getUserNetworkInfo(userId);
 
-    // Check if we have network information for both users
+    // Check if we have network information for both devices
     if (!sourceNetworkInfo || !targetNetworkInfo) {
       return res.status(400).json({
-        error: "Cannot determine network information for one or both users",
+        error: "Cannot determine network information for one or both devices",
       });
     }
 
-    // Check if users are on the same subnet
+    // Check if devices are on the same subnet
     const sameSubnet =
       sourceNetworkInfo.subnet &&
       targetNetworkInfo.subnet &&
       sourceNetworkInfo.subnet === targetNetworkInfo.subnet;
 
-    // Check if both users are connected via ethernet
+    // Check if both devices are connected via ethernet
     const bothEthernet =
       sourceNetworkInfo.isEthernet && targetNetworkInfo.isEthernet;
 
-    // Check if users have the same network property (backward compatibility)
+    // Check if devices have the same network property (backward compatibility)
     const sameNetworkProperty =
       sourceNetworkInfo.network &&
       targetNetworkInfo.network &&
       sourceNetworkInfo.network === targetNetworkInfo.network;
 
-    // Allow LAN connection only if users are on the same subnet OR both connected via ethernet
+    // Allow LAN connection only if devices are on the same subnet OR both connected via ethernet
     // The sameNetworkProperty check is kept for backward compatibility but the primary logic is sameSubnet OR bothEthernet
     if (!(sameSubnet || bothEthernet) && !sameNetworkProperty) {
       return res.status(400).json({
         error:
-          "LAN connections are only allowed between users on the same subnet or if both are connected via Ethernet.",
+          "LAN connections are only allowed between devices on the same subnet or if both are connected via Ethernet.",
       });
     }
   }
 
-  // Check if connection already exists between these users
+  // Check if connection already exists between these devices
   const existingConnection = connections.find(
     (conn) =>
       (conn.sourceId === sourceId && conn.targetId === userId) ||
@@ -443,7 +467,7 @@ app.post("/api/connect", (req, res) => {
   if (existingConnection) {
     return res
       .status(400)
-      .json({ error: "Connection already exists between these users" });
+      .json({ error: "Connection already exists between these devices" });
   }
 
   // Create new connection
@@ -485,37 +509,60 @@ app.delete("/api/connections/:id", (req, res) => {
 io.on("connection", (socket) => {
   console.log("New client connected");
 
-  // Handle user registration
+  // Handle device registration (users represent devices connecting to the website)
   socket.on("register-user", (userData) => {
-    console.log("User Data: ", userData);
-    // Use a unique identifier for the user (e.g., userData.id or userData.name)
+    console.log("Device Data: ", userData);
+    // Use a unique identifier for the device (e.g., userData.id or userData.name)
     if (userData && !userData.name) return;
     let userId = userData.id || `user-${Date.now()}`;
-    // Check if a user with the same name or id is already connected (regardless of device name)
+    // Check if a device with the same name or id is already connected (regardless of device name)
     let existingUser = users.find((u) => u.name === userData.name);
     let user;
     console.log(existingUser);
     if (existingUser) {
-      // Prevent duplicate user registration (even if device name is different)
+      // Prevent duplicate device registration (even if device name is different)
       user = { ...existingUser, status: "online" };
-      // Update user in users array
+      // Update device in users array
       const idx = users.findIndex((u) => u.name === user.name);
       users[idx] = user;
       userId = user.id;
     } else {
-      // Add new user
+      // Add new device
       user = {
         id: userId,
-        name: userData.name || `User-${users.length + 1}`,
+        name: userData.name || `Device-${users.length + 1}`,
         status: "online",
       };
       users.push(user);
     }
-    // Map socket to userId
+    
+    // Add the user to devices array if not already present
+    const existingDevice = devices.find(d => d.name === user.name);
+    if (!existingDevice) {
+      const newDevice = {
+        id: `device-user-${user.id}`,
+        name: user.name,
+        ip: 'Connected to Website',
+        mac: 'N/A',
+        type: 'computer',
+        isEthernet: false,
+        status: 'online',
+        isWebsiteUser: true
+      };
+      devices.push(newDevice);
+      // Notify all clients about the new device
+      io.emit("device-update", [newDevice]);
+    } else {
+      // Mark existing device as a website user
+      existingDevice.isWebsiteUser = true;
+      existingDevice.status = 'online';
+    }
+    
+    // Map socket to userId (device ID)
     socketUserMap.set(socket.id, userId);
-    // Acknowledge registration with user data
+    // Acknowledge registration with device data
     socket.emit("user-registered", user);
-    // Notify all clients about updated user list
+    // Notify all clients about updated device list
     io.emit("user-update", users);
   });
 
@@ -523,22 +570,28 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     const userId = socketUserMap.get(socket.id);
     if (userId) {
-      // Mark user as offline
+      // Mark device as offline
       const userIdx = users.findIndex((u) => u.id === userId);
       if (userIdx !== -1) {
         users[userIdx].status = "offline";
+        
+        // Remove the user from devices array if they were added as a website user
+        const deviceIdx = devices.findIndex((d) => d.isWebsiteUser && d.name === users[userIdx].name);
+        if (deviceIdx !== -1) {
+          devices.splice(deviceIdx, 1);
+        }
       }
       // Remove mapping
       socketUserMap.delete(socket.id);
     }
-    // If no users are online, clear all memory
+    // If no devices are online, clear all memory
     const onlineUsers = users.filter((u) => u.status === "online");
     if (onlineUsers.length === 0) {
       users.length = 0;
       connections.length = 0;
       devices.length = 0;
       socketUserMap.clear();
-      console.log("All users disconnected. Memory cleared.");
+      console.log("All devices disconnected. Memory cleared.");
     }
     io.emit("user-update", users);
     io.emit("connection-update", connections);
