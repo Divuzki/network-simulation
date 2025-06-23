@@ -8,7 +8,7 @@ export const setupSocket = (): Socket => {
   // Connect to the real backend
   // Use environment variable for socket URL, defaulting to localhost for development
   const socketUrl =
-    import.meta.env.VITE_SOCKET_URL || "http://192.168.1`.173:3003";
+    import.meta.env.VITE_SOCKET_URL || "http://192.168.1.173:3003";
   const socket = io(socketUrl);
 
   return socket;

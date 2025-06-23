@@ -361,8 +361,10 @@ app.get("/api/users", async (req, res) => {
       };
     })
   );
-  res.json(usersWithMetrics);
+  // res.json(usersWithMetrics);
+  res.json(users);
 });
+console.log(users);
 
 app.post("/api/connect", (req, res) => {
   const { userId, connectionType } = req.body;
@@ -513,12 +515,12 @@ io.on("connection", (socket) => {
   socket.on("register-user", (userData) => {
     console.log("Device Data: ", userData);
     // Use a unique identifier for the device (e.g., userData.id or userData.name)
-    if (userData && !userData.name) return;
+    // if (userData && !userData.name) return;
     let userId = userData.id || `user-${Date.now()}`;
     // Check if a device with the same name or id is already connected (regardless of device name)
     let existingUser = users.find((u) => u.name === userData.name);
     let user;
-    console.log(existingUser);
+    console.error("existingUser:", existingUser);
     if (existingUser) {
       // Prevent duplicate device registration (even if device name is different)
       user = { ...existingUser, status: "online" };
