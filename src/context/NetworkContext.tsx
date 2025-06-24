@@ -62,9 +62,18 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
           response.data.find((d) => d.type === "computer") || response.data[0];
         const deviceName = thisDevice && thisDevice.name;
 
-        // Create user with device name
+        // Create user with device name and persistent ID
+        const getUserId = () => {
+          let userId = localStorage.getItem('userId');
+          if (!userId) {
+            userId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem('userId', userId);
+          }
+          return userId;
+        };
+
         const defaultUser: User = {
-          id: `user-${Date.now()}`,
+          id: getUserId(),
           name: deviceName ?? null,
           status: "online",
         };
@@ -95,7 +104,7 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         const uniqueDevices = [...prev];
         updatedDevices.forEach((device) => {
           const existingIndex = uniqueDevices.findIndex(
-            (d) => d.name === device.name
+            (d) => d.id === device.id
           );
           if (existingIndex >= 0) {
             uniqueDevices[existingIndex] = { ...device };
