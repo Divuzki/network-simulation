@@ -385,7 +385,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
               </p>
             ) : connectionType === "LAN" ? (
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Local Area Network connections require both users to be on the same network subnet OR both connected via Ethernet. This ensures secure local network communication.
+                Local Area Network connections require both users to be on the same network and connected via Ethernet cable. This ensures secure local network communication.
               </p>
             ) : (
               <p className="text-sm text-gray-600 dark:text-gray-400">

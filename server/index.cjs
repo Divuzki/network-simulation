@@ -34,7 +34,7 @@ const chatbotResponses = {
   connection:
     "Connections represent how devices communicate with each other. In this application, you can create different types of connections like LAN or P2P between devices.",
   p2p: "P2P (Peer-to-Peer) is a network model where computers can communicate directly without a central server. In this application, P2P connections are limited to 1-to-1 connections.",
-  lan: "LAN (Local Area Network) connects computers in a limited area like a home, office, or building. In this application, LAN connections require devices to be on the same subnet or both connected via Ethernet.",
+  lan: "LAN (Local Area Network) connects computers in a limited area like a home, office, or building. In this application, LAN connections require both users to be on the same network and connected via Ethernet cable.",
   scan: "The scan feature discovers devices on your local network. Click the 'Scan Network' button to find devices connected to your network.",
   metrics:
     "Network metrics include upload/download speed, latency, packet loss, and throughput. These metrics help you understand the performance of your network connections.",
@@ -513,7 +513,7 @@ app.post("/api/connect", (req, res) => {
     }
   }
 
-  // LAN connections: only allow if both devices are on the same network (same subnet) or connected via ethernet
+  // LAN connections: only allow if both devices are connected via ethernet
   if (connectionType === "LAN") {
     const sourceNetworkInfo = getUserNetworkInfo(sourceId);
     const targetNetworkInfo = getUserNetworkInfo(userId);
@@ -525,28 +525,21 @@ app.post("/api/connect", (req, res) => {
       });
     }
 
-    // Check if devices are on the same subnet
+    // Check if both devices are connected via ethernet
+    const bothEthernet =
+      sourceNetworkInfo.isEthernet && targetNetworkInfo.isEthernet;
+
+    // Check if devices are on the same subnet (for additional validation)
     const sameSubnet =
       sourceNetworkInfo.subnet &&
       targetNetworkInfo.subnet &&
       sourceNetworkInfo.subnet === targetNetworkInfo.subnet;
 
-    // Check if both devices are connected via ethernet
-    const bothEthernet =
-      sourceNetworkInfo.isEthernet && targetNetworkInfo.isEthernet;
-
-    // Check if devices have the same network property (backward compatibility)
-    const sameNetworkProperty =
-      sourceNetworkInfo.network &&
-      targetNetworkInfo.network &&
-      sourceNetworkInfo.network === targetNetworkInfo.network;
-
-    // Allow LAN connection only if devices are on the same subnet OR both connected via ethernet
-    // The sameNetworkProperty check is kept for backward compatibility but the primary logic is sameSubnet OR bothEthernet
-    if (!(sameSubnet || bothEthernet) && !sameNetworkProperty) {
+    // LAN connections require both devices to be connected via ethernet AND on the same network
+    if (!bothEthernet || !sameSubnet) {
       return res.status(400).json({
         error:
-          "LAN connections are only allowed between devices on the same subnet or if both are connected via Ethernet.",
+          "LAN connections require both users to be on the same network and connected via Ethernet cable.",
       });
     }
   }

@@ -94,12 +94,12 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
           content: (
             <>
               <p className="mb-4">
-                A Local Area Network (LAN) connects devices within the same network subnet or via Ethernet connections. Both users must be on the same network or connected via Ethernet to establish a LAN connection.
+                A Local Area Network (LAN) connects devices within the same network via Ethernet connections. Both users must be on the same network and connected via Ethernet cable to establish a LAN connection.
               </p>
               <h4 className="font-bold mb-2">Connection Requirements:</h4>
               <ul className="list-disc pl-5 mb-4 space-y-2">
-                <li>Both users on the same network subnet, OR</li>
-                <li>Both users connected via Ethernet</li>
+                <li>Both users on the same network</li>
+                <li>Both users connected via Ethernet cable</li>
                 <li>High-speed, reliable connections</li>
                 <li>Secure local network communication</li>
               </ul>
