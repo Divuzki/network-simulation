@@ -385,13 +385,11 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
               </p>
             ) : connectionType === "LAN" ? (
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Local Area Network connections route through your local network
-                infrastructure, typically using wired ethernet.
+                Local Area Network connections require both users to be on the same network subnet OR both connected via Ethernet. This ensures secure local network communication.
               </p>
             ) : (
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Wide Area Network connections use internet infrastructure to
-                connect users across different networks.
+                Wide Area Network connections allow any user to connect to others regardless of their network location or connection type.
               </p>
             )}
 

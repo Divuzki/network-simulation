@@ -38,7 +38,7 @@ const chatbotResponses = {
   scan: "The scan feature discovers devices on your local network. Click the 'Scan Network' button to find devices connected to your network.",
   metrics:
     "Network metrics include upload/download speed, latency, packet loss, and throughput. These metrics help you understand the performance of your network connections.",
-  wan: "WAN (Wide Area Network) connects networks that are geographically far away. This application supports visualization of WAN connections.",
+  wan: "WAN (Wide Area Network) allows any user to connect to others regardless of their network location or connection type. No restrictions apply - users can connect across different networks and geographical locations.",
   default:
     "I'm a simple network assistant. I can help with basic network concepts and how to use this application. Try asking about network topology, connections, or specific features.",
 };
@@ -389,14 +389,23 @@ app.post("/api/scan", (req, res) => {
       }
     }
 
-    // Remove duplicates from global devices array by name
+    // Remove duplicates from global devices array by IP and MAC address (more reliable than name)
     for (const device of newDevices) {
-      const existingIdx = devices.findIndex((d) => d.name === device.name);
+      const existingIdx = devices.findIndex((d) => 
+        (d.ip === device.ip && d.ip !== "Connected to Website") || 
+        (d.mac === device.mac && d.mac !== "N/A")
+      );
       if (existingIdx === -1) {
         devices.push(device);
       } else {
-        // Update the device info, preserving website user flag
-        devices[existingIdx] = { ...devices[existingIdx], ...device };
+        // Update the device info, preserving important flags and using the actual device name
+        const updatedDevice = { 
+          ...devices[existingIdx], 
+          ...device,
+          // Preserve website user flag if it exists
+          isWebsiteUser: devices[existingIdx].isWebsiteUser || device.isWebsiteUser
+        };
+        devices[existingIdx] = updatedDevice;
       }
     }
     // Notify all clients
@@ -612,19 +621,30 @@ io.on("connection", (socket) => {
       users[idx] = user;
       userId = user.id;
     } else {
-      // Add new device - each connection gets a unique entry
-      user = {
-        id: userId,
-        name: userData.name || `Device-${users.length + 1}`,
-        status: "online",
-      };
-      users.push(user);
+      // Check for duplicate by name to prevent multiple users with same device name
+      const duplicateByName = users.find((u) => u.name === userData.name && userData.name);
+      if (duplicateByName) {
+        // Use existing user but update status
+        user = { ...duplicateByName, status: "online" };
+        const idx = users.findIndex((u) => u.id === duplicateByName.id);
+        users[idx] = user;
+        userId = user.id;
+      } else {
+        // Add new device - each connection gets a unique entry
+        user = {
+          id: userId,
+          name: userData.name || `Device-${users.length + 1}`,
+          status: "online",
+        };
+        users.push(user);
+      }
     }
 
-    // Add the user to devices array - each user gets a unique device entry
-    const existingDevice = devices.find(
-      (d) => d.id === `device-user-${user.id}`
+    // Add the user to devices array - prevent duplicates by checking both device ID and name
+    let existingDevice = devices.find(
+      (d) => d.id === `device-user-${user.id}` || (d.name === user.name && d.isWebsiteUser)
     );
+    
     if (!existingDevice) {
       const newDevice = {
         id: `device-user-${user.id}`,
@@ -640,9 +660,11 @@ io.on("connection", (socket) => {
       // Notify all clients about the new device
       io.emit("device-update", [newDevice]);
     } else {
-      // Update existing device status for reconnection
+      // Update existing device status for reconnection and ensure correct ID
       existingDevice.status = "online";
       existingDevice.isWebsiteUser = true;
+      existingDevice.id = `device-user-${user.id}`; // Ensure consistent device ID
+      existingDevice.name = user.name; // Ensure name is displayed correctly
     }
 
     // Map socket to userId (device ID)

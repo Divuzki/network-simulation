@@ -94,16 +94,14 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
           content: (
             <>
               <p className="mb-4">
-                A Local Area Network (LAN) is a network that connects devices
-                within a limited area, typically using wired connections like
-                Ethernet.
+                A Local Area Network (LAN) connects devices within the same network subnet or via Ethernet connections. Both users must be on the same network or connected via Ethernet to establish a LAN connection.
               </p>
-              <h4 className="font-bold mb-2">Key Characteristics:</h4>
+              <h4 className="font-bold mb-2">Connection Requirements:</h4>
               <ul className="list-disc pl-5 mb-4 space-y-2">
+                <li>Both users on the same network subnet, OR</li>
+                <li>Both users connected via Ethernet</li>
                 <li>High-speed, reliable connections</li>
-                <li>Usually limited to a single location (home, office)</li>
-                <li>Uses routing equipment to manage traffic</li>
-                <li>Typically faster and more stable than wireless</li>
+                <li>Secure local network communication</li>
               </ul>
               <h4 className="font-bold mb-2">Common Uses:</h4>
               <p className="mb-4">
@@ -123,33 +121,29 @@ const EducationalModal: React.FC<EducationalModalProps> = ({
         };
       case "wan":
         return {
-          title: "Wireless Local Area Network (WAN) Connections",
+          title: "Wide Area Network (WAN) Connections",
           icon: <Wifi className="h-6 w-6 text-purple-500" />,
           content: (
             <>
               <p className="mb-4">
-                A Wireless Local Area Network (WAN) connects devices using
-                wireless communication, most commonly Wi-Fi technology.
+                A Wide Area Network (WAN) allows any user to connect to others regardless of their network location or connection type. No restrictions apply.
               </p>
               <h4 className="font-bold mb-2">Key Characteristics:</h4>
               <ul className="list-disc pl-5 mb-4 space-y-2">
-                <li>No physical cables needed</li>
-                <li>Flexibility in device placement</li>
-                <li>Operates using radio frequencies (2.4GHz, 5GHz, 6GHz)</li>
-                <li>Slightly higher latency than wired connections</li>
+                <li>No network location restrictions</li>
+                <li>Connects users across different networks</li>
+                <li>Uses internet infrastructure</li>
+                <li>Most flexible connection type</li>
               </ul>
-              <h4 className="font-bold mb-2">Standards:</h4>
+              <h4 className="font-bold mb-2">Common Uses:</h4>
               <p className="mb-4">
-                WANs typically follow IEEE 802.11 standards (Wi-Fi), with
-                various versions like 802.11n, 802.11ac, and 802.11ax (Wi-Fi 6)
-                offering different speeds and features.
+                WANs are used for connecting remote offices, cloud services, and enabling global communication across different geographical locations.
               </p>
               <div className="p-3 bg-gray-100 dark:bg-gray-700 rounded-md">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   In our visualization, WAN connections are shown as{" "}
                   <span className="connection-wan">dashed purple lines{" "}</span>
-                  between nodes, typically connecting through a wireless access
-                  point.
+                  between nodes, representing unrestricted connectivity.
                 </p>
               </div>
             </>
