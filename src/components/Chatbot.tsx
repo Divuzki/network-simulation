@@ -33,7 +33,7 @@ const Chatbot: React.FC = () => {
     try {
       const response = await fetch(
         `${
-          import.meta.env.VITE_API_URL || "http://192.168.1.173:3003/api"
+          import.meta.env.VITE_API_URL || "http://192.168.0.174:3003/api"
         }/chat`,
         {
           method: "POST",

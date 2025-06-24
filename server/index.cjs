@@ -618,7 +618,8 @@ io.on("connection", (socket) => {
     } else {
       // Add new device - each connection gets a unique entry
       // Use the actual device name from userData, or generate a meaningful fallback
-      const deviceName = userData.name || userData.deviceName || `Web User ${users.length + 1}`;
+      const deviceName =
+        userData.name || userData.deviceName || `Web User ${users.length + 1}`;
       user = {
         id: userId,
         name: deviceName,
@@ -628,9 +629,7 @@ io.on("connection", (socket) => {
     }
 
     // Add the user to devices array - prevent duplicates by checking device ID only
-    let existingDevice = devices.find(
-      (d) => d.id === `device-user-${user.id}`
-    );
+    let existingDevice = devices.find((d) => d.id === `device-user-${user.id}`);
 
     if (!existingDevice) {
       const newDevice = {
@@ -647,11 +646,12 @@ io.on("connection", (socket) => {
       // Notify all clients about the new device
       io.emit("device-update", [newDevice]);
     } else {
-      // Update existing device status for reconnection and ensure correct ID
+      // Update existing device status for reconnection
       existingDevice.status = "online";
       existingDevice.isWebsiteUser = true;
-      existingDevice.id = `device-user-${user.id}`; // Ensure consistent device ID
-      existingDevice.name = user.name; // Ensure name is displayed correctly
+      existingDevice.name = user.name; // Update name in case it changed
+      // Notify all clients about the updated device
+      io.emit("device-update", [existingDevice]);
     }
 
     // Map socket to userId (device ID)
@@ -718,9 +718,9 @@ function parseArpOutput(output) {
 
     if (os.platform() === "win32") {
       // Windows ARP output format:
-      // Interface: 192.168.1.173 --- 0x4
+      // Interface: 192.168.0.174 --- 0x4
       //   Internet Address      Physical Address      Type
-      //   192.168.1.173           00-1a-2b-3c-4d-5e     dynamic
+      //   192.168.0.174           00-1a-2b-3c-4d-5e     dynamic
       //   192.168.1.100         a4-83-e7-68-e2-30     dynamic
 
       // Skip header lines
@@ -750,8 +750,8 @@ function parseArpOutput(output) {
       }
     } else {
       // Unix/macOS ARP output format:
-      // Example: divines-mbp (192.168.1.173) at a4:83:e7:68:e2:30 on en0 ifscope permanent [ethernet]
-      // Example router: MyRouterSSID (192.168.1.173) at 00:1a:2b:3c:4d:5e on en0 ifscope [ethernet]
+      // Example: divines-mbp (192.168.0.174) at a4:83:e7:68:e2:30 on en0 ifscope permanent [ethernet]
+      // Example router: MyRouterSSID (192.168.0.174) at 00:1a:2b:3c:4d:5e on en0 ifscope [ethernet]
 
       const ethMatch = line.match(
         /^([\w\-]+(?:\.[\w\-]+)*) \(([0-9.]+)\) at ([0-9a-f:]+) on (\w+) ifscope(?: \w+)? \[ethernet\]/i
@@ -821,5 +821,5 @@ const HOST = process.env.HOST || "0.0.0.0"; // Bind to all interfaces by default
 server.listen(PORT, HOST, () => {
   console.log(`Server running on ${HOST}:${PORT}`);
   console.log(`Platform: ${require("os").platform()}`);
-  console.log(`Access the application at: http://192.168.1.173:${PORT}`);
+  console.log(`Access the application at: http://192.168.0.174:${PORT}`);
 });

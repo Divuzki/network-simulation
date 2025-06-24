@@ -106,6 +106,7 @@ export const getEdgeOptions = () => {
       inherit: false
     },
     smooth: {
+      enabled: true,
       type: 'continuous',
       forceDirection: 'none',
       roundness: 0.2

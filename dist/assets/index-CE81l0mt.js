@@ -45472,7 +45472,7 @@ class Ki extends ut {
       t.hostname && !t.port && (t.port = this.secure ? "443" : "80"),
       (this.hostname =
         t.hostname ||
-        (typeof location < "u" ? location.hostname : "192.168.1.173")),
+        (typeof location < "u" ? location.hostname : "192.168.0.174")),
       (this.port =
         t.port ||
         (typeof location < "u" && location.port
@@ -45518,7 +45518,7 @@ class Ki extends ut {
             this._beforeunloadEventListener,
             !1
           )),
-        this.hostname !== "192.168.1.173" &&
+        this.hostname !== "192.168.0.174" &&
           ((this._offlineEventListener = () => {
             this._onClose("transport close", {
               description: "network connection lost",
@@ -46750,7 +46750,7 @@ function Nf(e, r) {
   );
 }
 Object.assign(Nf, { Manager: wb, Socket: VF, io: Nf, connect: Nf });
-const uPe = () => Nf("http://192.168.1.173:3003");
+const uPe = () => Nf("http://192.168.0.174:3003");
 function KF(e, r) {
   return function () {
     return e.apply(r, arguments);
@@ -47367,7 +47367,7 @@ const aj = {
     typeof WorkerGlobalScope < "u" &&
     self instanceof WorkerGlobalScope &&
     typeof self.importScripts == "function",
-  aCe = (cw && window.location.href) || "http://192.168.1.173",
+  aCe = (cw && window.location.href) || "http://192.168.0.174",
   oCe = Object.freeze(
     Object.defineProperty(
       {
@@ -48908,7 +48908,7 @@ ht.formToJSON = (e) => oj(x.isHTMLForm(e) ? new FormData(e) : e);
 ht.getAdapter = hj.getAdapter;
 ht.HttpStatusCode = Ob;
 ht.default = ht;
-const BCe = "http://192.168.1.173:3003/api",
+const BCe = "http://192.168.0.174:3003/api",
   fi = ht.create({
     baseURL: BCe,
     headers: { "Content-Type": "application/json" },

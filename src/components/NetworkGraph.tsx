@@ -18,8 +18,8 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({ onEducationClick }) => {
     // Only create the network if the container exists
     if (!containerRef.current) return;
 
-    // Create nodes for devices and users
-    const nodes = new DataSet([
+    // Create nodes for devices and users with deduplication
+    const allNodes = [
       ...devices.map((device) => ({
         id: device.id,
         label: device.name,
@@ -32,7 +32,14 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({ onEducationClick }) => {
         group: "user",
         title: user.name,
       })),
-    ]);
+    ];
+    
+    // Remove duplicates by ID to prevent vis-network errors
+    const uniqueNodes = allNodes.filter((node, index, self) => 
+      index === self.findIndex(n => n.id === node.id)
+    );
+    
+    const nodes = new DataSet(uniqueNodes);
 
     // Create edges for connections
     const edges = new DataSet(
@@ -123,7 +130,7 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({ onEducationClick }) => {
         const edgeId = params.edges[0];
         const edge = edges.get(edgeId);
 
-        if (edge) {
+        if (edge && edge.label) {
           onEducationClick(edge.label.toLowerCase());
         }
       }
@@ -155,8 +162,8 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({ onEducationClick }) => {
     const network = networkRef.current;
 
     // Update nodes and edges when data changes
-    const nodes = network.body.data.nodes;
-    const edges = network.body.data.edges;
+    const nodes = (network as any).body.data.nodes;
+    const edges = (network as any).body.data.edges;
 
     // Update nodes
     const currentNodeIds = new Set(nodes.getIds());
@@ -231,7 +238,7 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({ onEducationClick }) => {
     });
 
     // Remove connections that no longer exist
-    edges.getIds().forEach((id) => {
+    edges.getIds().forEach((id: string | number) => {
       if (!connections.some((c) => c.id === id)) {
         edges.remove(id);
       }
@@ -259,8 +266,19 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({ onEducationClick }) => {
 const DeviceInfo: React.FC<{ deviceId: string }> = ({ deviceId }) => {
   const { devices } = useNetwork();
   const device = devices.find((d) => d.id === deviceId);
-  const [metrics, setMetrics] = React.useState<any>(null);
-  const [bandwidth, setBandwidth] = React.useState<any>(null);
+  const [metrics, setMetrics] = React.useState<{
+    downloadSpeed: number;
+    uploadSpeed: number;
+    latency: number;
+    packetLoss?: number;
+    throughput?: number;
+    jitter?: number;
+    maxBandwidth?: number;
+  } | null>(null);
+  const [bandwidth, setBandwidth] = React.useState<{
+    downloadSpeed: number;
+    uploadSpeed: number;
+  } | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [speedTesting, setSpeedTesting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -289,7 +307,7 @@ const DeviceInfo: React.FC<{ deviceId: string }> = ({ deviceId }) => {
         m.getDeviceBandwidth(device.id)
       );
       setBandwidth(bwRes.data);
-    } catch (e) {
+    } catch {
       setError("Failed to fetch network metrics");
     } finally {
       setLoading(false);
@@ -306,7 +324,7 @@ const DeviceInfo: React.FC<{ deviceId: string }> = ({ deviceId }) => {
       );
       setBandwidth(res.data);
       setActiveTab("metrics");
-    } catch (e) {
+    } catch {
       setError("Failed to run speed test");
     } finally {
       setSpeedTesting(false);
@@ -468,7 +486,15 @@ const MetricCard: React.FC<{
 const UserInfo: React.FC<{ userId: string }> = ({ userId }) => {
   const { users, connections } = useNetwork();
   const user = users.find((u) => u.id === userId);
-  const [metrics, setMetrics] = React.useState<any>(null);
+  const [metrics, setMetrics] = React.useState<{
+    downloadSpeed: number;
+    uploadSpeed: number;
+    latency: number;
+    packetLoss?: number;
+    throughput?: number;
+    jitter?: number;
+    maxBandwidth?: number;
+  } | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [activeTab, setActiveTab] = React.useState<"info" | "metrics">("info");
@@ -494,7 +520,7 @@ const UserInfo: React.FC<{ userId: string }> = ({ userId }) => {
       const res = await apiService.getDeviceMetrics(user.id);
       setMetrics(res.data);
       setActiveTab("metrics");
-    } catch (e) {
+    } catch {
       setError("Failed to test connection");
     } finally {
       setLoading(false);
@@ -613,7 +639,15 @@ const UserInfo: React.FC<{ userId: string }> = ({ userId }) => {
 };
 
 // Helper functions for connection quality
-const getQualityPercentage = (metrics: any): number => {
+const getQualityPercentage = (metrics: {
+  downloadSpeed: number;
+  uploadSpeed: number;
+  latency: number;
+  packetLoss?: number;
+  throughput?: number;
+  jitter?: number;
+  maxBandwidth?: number;
+}): number => {
   // Calculate a quality score based on download speed, upload speed, and latency
   const downloadScore = Math.min(metrics.downloadSpeed / 100, 1) * 40; // 40% weight
   const uploadScore = Math.min(metrics.uploadSpeed / 50, 1) * 30; // 30% weight
@@ -623,7 +657,15 @@ const getQualityPercentage = (metrics: any): number => {
   return Math.min(Math.round(downloadScore + uploadScore + latencyScore), 100);
 };
 
-const getQualityColor = (metrics: any): string => {
+const getQualityColor = (metrics: {
+  downloadSpeed: number;
+  uploadSpeed: number;
+  latency: number;
+  packetLoss?: number;
+  throughput?: number;
+  jitter?: number;
+  maxBandwidth?: number;
+}): string => {
   const quality = getQualityPercentage(metrics);
   if (quality >= 80) return "bg-green-500";
   if (quality >= 60) return "bg-blue-500";
@@ -632,7 +674,15 @@ const getQualityColor = (metrics: any): string => {
   return "bg-red-500";
 };
 
-const getQualityLabel = (metrics: any): string => {
+const getQualityLabel = (metrics: {
+  downloadSpeed: number;
+  uploadSpeed: number;
+  latency: number;
+  packetLoss?: number;
+  throughput?: number;
+  jitter?: number;
+  maxBandwidth?: number;
+}): string => {
   const quality = getQualityPercentage(metrics);
   if (quality >= 80) return "Excellent";
   if (quality >= 60) return "Good";
