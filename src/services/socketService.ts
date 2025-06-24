@@ -1,7 +1,7 @@
 import { io, Socket } from "socket.io-client";
 
 // Store for callbacks
-const mockCallbacks: Record<string, Function> = {};
+const mockCallbacks: Record<string, (...args: unknown[]) => void> = {};
 
 // Initialize Socket.io connection
 export const setupSocket = (): Socket => {
@@ -16,7 +16,7 @@ export const setupSocket = (): Socket => {
 
 // This function is kept for compatibility with existing code
 // but won't be needed once you're using the real socket
-export const simulateSocketEvent = (event: string, data: any) => {
+export const simulateSocketEvent = (event: string, data: unknown) => {
   if (mockCallbacks[event]) {
     mockCallbacks[event](data);
   }

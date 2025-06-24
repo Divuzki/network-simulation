@@ -138,7 +138,7 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
 
         setDevices(devicesResponse.data);
         
-        const usersWithMetrics = usersResponse.data.map((u: any) => ({
+        const usersWithMetrics = usersResponse.data.map((u: User) => ({
           ...u,
           networkMetrics: u.networkMetrics || null,
         }));
@@ -165,7 +165,7 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
   const handleScanNetwork = useCallback(async () => {
     setIsScanning(true);
     try {
-      const response = await scanNetwork();
+      await scanNetwork();
       toast.success("Network scan completed");
     } catch (error) {
       console.error("Error scanning network:", error);
@@ -209,13 +209,7 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
       if (connectionType === "LAN") {
         const sourceUser = users.find((u) => u.id === currentUser.id);
         const targetUser = users.find((u) => u.id === userId);
-        if (
-          !sourceUser ||
-          !targetUser ||
-          !sourceUser.network ||
-          !targetUser.network ||
-          sourceUser.network !== targetUser.network
-        ) {
+        if (!sourceUser || !targetUser) {
           return false;
         }
       }
@@ -249,7 +243,7 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       try {
-        const response = await connectToUser(
+        await connectToUser(
           userId,
           connectionType,
           currentUser.id
