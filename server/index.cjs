@@ -102,31 +102,64 @@ async function getRealNetworkMetrics(entityId) {
     uploadSpeed = cached.uploadSpeed;
     downloadSpeed = cached.downloadSpeed;
   } else {
-    console.log(`Running speedtest-cli for ${entityId}`);
+    console.log(`Running speedtest for ${entityId}`);
     try {
-      // Use speedtest-cli to get network speeds
-      const { stdout: speedtestCliOut } = await execAsync(
-        "speedtest-cli --json"
-      );
-      const speedData = JSON.parse(speedtestCliOut);
-
-      if (speedData && speedData.download) {
-        // speedtest-cli returns download/upload in bits/sec
-        downloadSpeed = parseFloat((speedData.download / 1000000).toFixed(2)); // Convert to Mbps
-      }
-      if (speedData && speedData.upload) {
-        uploadSpeed = parseFloat((speedData.upload / 1000000).toFixed(2)); // Convert to Mbps
+      const os = require("os");
+      let speedtestCommand;
+      
+      // Try different speedtest commands based on platform
+      if (os.platform() === "win32") {
+        // On Windows, try speedtest.exe (official Ookla CLI) first, then speedtest-cli
+        try {
+          const { stdout: speedtestOut } = await execAsync("speedtest --format=json");
+          const speedData = JSON.parse(speedtestOut);
+          
+          if (speedData && speedData.download && speedData.download.bandwidth) {
+            // Official Ookla CLI returns bandwidth in bytes/sec
+            downloadSpeed = parseFloat((speedData.download.bandwidth * 8 / 1000000).toFixed(2)); // Convert to Mbps
+          }
+          if (speedData && speedData.upload && speedData.upload.bandwidth) {
+            uploadSpeed = parseFloat((speedData.upload.bandwidth * 8 / 1000000).toFixed(2)); // Convert to Mbps
+          }
+        } catch (ooklaErr) {
+          console.log(`Official speedtest CLI not available, trying speedtest-cli: ${ooklaErr.message}`);
+          // Fallback to speedtest-cli
+          const { stdout: speedtestCliOut } = await execAsync("speedtest-cli --json");
+          const speedData = JSON.parse(speedtestCliOut);
+          
+          if (speedData && speedData.download) {
+            downloadSpeed = parseFloat((speedData.download / 1000000).toFixed(2)); // Convert to Mbps
+          }
+          if (speedData && speedData.upload) {
+            uploadSpeed = parseFloat((speedData.upload / 1000000).toFixed(2)); // Convert to Mbps
+          }
+        }
+      } else {
+        // Unix/Linux/macOS: use speedtest-cli
+        const { stdout: speedtestCliOut } = await execAsync("speedtest-cli --json");
+        const speedData = JSON.parse(speedtestCliOut);
+        
+        if (speedData && speedData.download) {
+          downloadSpeed = parseFloat((speedData.download / 1000000).toFixed(2)); // Convert to Mbps
+        }
+        if (speedData && speedData.upload) {
+          uploadSpeed = parseFloat((speedData.upload / 1000000).toFixed(2)); // Convert to Mbps
+        }
       }
 
       speedTestCache.data = { downloadSpeed, uploadSpeed };
       speedTestCache.timestamp = currentTime;
       console.log(
-        `Speedtest.net test for ${entityId} completed. Download: ${downloadSpeed} Mbps, Upload: ${uploadSpeed} Mbps`
+        `Speedtest for ${entityId} completed. Download: ${downloadSpeed} Mbps, Upload: ${uploadSpeed} Mbps`
       );
     } catch (err) {
-      console.error(`speedtest-cli error for ${entityId}: ${err.message}`);
+      console.error(`Speedtest error for ${entityId}: ${err.message}`);
+      console.log(`Note: Make sure speedtest CLI is installed. On Windows: 'winget install Ookla.Speedtest.CLI' or 'pip install speedtest-cli'`);
       speedTestCache.data = null;
       speedTestCache.timestamp = 0;
+      // Set fallback values to indicate speedtest is not available
+      downloadSpeed = null;
+      uploadSpeed = null;
     }
   }
   throughput = downloadSpeed;
@@ -160,29 +193,59 @@ async function getRealNetworkMetrics(entityId) {
       console.warn(`Ping stderr for ${pingTarget} (${entityId}): ${pingErr}`);
     }
 
-    const latencyMatch = pingOut.match(
-      /round-trip min\/avg\/max\/(?:stddev|mdev) = [\d.]+\/([\d.]+)\/[\d.]+\/[\d.]+ ms/
-    );
-    if (latencyMatch && latencyMatch[1]) {
-      latency = parseFloat(latencyMatch[1]);
-    } else {
-      const rttMatch = pingOut.match(/time=([\d.]+) ms/);
-      if (rttMatch && rttMatch[1]) {
-        latency = parseFloat(rttMatch[1]);
-        console.log(
-          `Used fallback RTT for latency for ${pingTarget}: ${latency} ms`
-        );
+    // Parse latency based on OS
+    if (os.platform() === "win32") {
+      // Windows ping output: "Average = 23ms" or "Minimum = 1ms, Maximum = 4ms, Average = 2ms"
+      const avgMatch = pingOut.match(/Average = ([\d.]+)ms/i);
+      if (avgMatch && avgMatch[1]) {
+        latency = parseFloat(avgMatch[1]);
       } else {
-        console.warn(
-          `Could not parse average latency from ping output for ${pingTarget}:\n${pingOut}`
-        );
+        // Fallback: look for individual time values
+        const timeMatch = pingOut.match(/time[<=]([\d.]+)ms/i);
+        if (timeMatch && timeMatch[1]) {
+          latency = parseFloat(timeMatch[1]);
+        }
+      }
+    } else {
+      // Unix/Linux/macOS ping output
+      const latencyMatch = pingOut.match(
+        /round-trip min\/avg\/max\/(?:stddev|mdev) = [\d.]+\/([\d.]+)\/[\d.]+\/[\d.]+ ms/
+      );
+      if (latencyMatch && latencyMatch[1]) {
+        latency = parseFloat(latencyMatch[1]);
+      } else {
+        const rttMatch = pingOut.match(/time=([\d.]+) ms/);
+        if (rttMatch && rttMatch[1]) {
+          latency = parseFloat(rttMatch[1]);
+          console.log(
+            `Used fallback RTT for latency for ${pingTarget}: ${latency} ms`
+          );
+        }
       }
     }
 
-    const lossMatch = pingOut.match(/([\d.]+)% packet loss/);
-    if (lossMatch && lossMatch[1]) {
-      packetLoss = parseFloat(lossMatch[1]);
+    if (!latency) {
+      console.warn(
+        `Could not parse latency from ping output for ${pingTarget}:\n${pingOut}`
+      );
+    }
+
+    // Parse packet loss based on OS
+    if (os.platform() === "win32") {
+      // Windows: "(25% loss)" or "Packets: Sent = 4, Received = 3, Lost = 1 (25% loss)"
+      const lossMatch = pingOut.match(/\((\d+)% loss\)/i) || pingOut.match(/Lost = \d+ \((\d+)% loss\)/i);
+      if (lossMatch && lossMatch[1]) {
+        packetLoss = parseFloat(lossMatch[1]);
+      }
     } else {
+      // Unix/Linux/macOS: "25% packet loss"
+      const lossMatch = pingOut.match(/([\d.]+)% packet loss/);
+      if (lossMatch && lossMatch[1]) {
+        packetLoss = parseFloat(lossMatch[1]);
+      }
+    }
+
+    if (packetLoss === null) {
       console.warn(
         `Could not parse packet loss from ping output for ${pingTarget}:\n${pingOut}`
       );
@@ -612,30 +675,70 @@ function parseArpOutput(output) {
   const os = require("os");
   const lines = output.split(os.platform() === "win32" ? "\r\n" : "\n");
   const newDevices = [];
+  
   for (const line of lines) {
-    // Example: divines-mbp (192.168.1.173) at a4:83:e7:68:e2:30 on en0 ifscope permanent [ethernet]
-    // Example router: MyRouterSSID (192.168.1.1) at 00:1a:2b:3c:4d:5e on en0 ifscope [ethernet]
-    // Updated regex to capture interface and check for [ethernet]
-    const ethMatch = line.match(
-      /^([\w\-]+(?:\.[\w\-]+)*) \(([0-9.]+)\) at ([0-9a-f:]+) on (\w+) ifscope(?: \w+)? \[ethernet\]/i
-    );
-    const generalMatch = line.match(
-      /^([\w\-]+(?:\.[\w\-]+)*) \(([0-9.]+)\) at ([0-9a-f:]+)/i // Fallback for non-ethernet or different formats
-    );
-
-    const match = ethMatch || generalMatch;
+    let match = null;
+    let ip = null;
+    let mac = null;
+    let hostnameOrSSID = null;
+    let isEthernet = false;
+    
+    if (os.platform() === "win32") {
+      // Windows ARP output format:
+      // Interface: 192.168.1.173 --- 0x4
+      //   Internet Address      Physical Address      Type
+      //   192.168.1.1           00-1a-2b-3c-4d-5e     dynamic
+      //   192.168.1.100         a4-83-e7-68-e2-30     dynamic
+      
+      // Skip header lines
+      if (line.includes("Interface:") || line.includes("Internet Address") || line.includes("---") || line.trim() === "") {
+        continue;
+      }
+      
+      // Match Windows ARP format: IP address followed by MAC address
+      const winMatch = line.match(/^\s*([0-9.]+)\s+([0-9a-f-]+)\s+(\w+)/i);
+      if (winMatch) {
+        ip = winMatch[1];
+        mac = winMatch[2].replace(/-/g, ":"); // Convert Windows MAC format (xx-xx-xx) to standard (xx:xx:xx)
+        const type = winMatch[3];
+        
+        // Try to resolve hostname (simplified - in real implementation you might want to do reverse DNS)
+        hostnameOrSSID = `Device-${ip.split('.').pop()}`; // Use last octet as simple identifier
+        
+        // Windows doesn't easily show ethernet vs wifi in ARP, so we'll assume dynamic entries could be either
+        isEthernet = false; // Default to false since we can't easily determine this from Windows ARP
+        
+        match = { ip, mac, hostnameOrSSID, isEthernet };
+      }
+    } else {
+      // Unix/macOS ARP output format:
+      // Example: divines-mbp (192.168.1.173) at a4:83:e7:68:e2:30 on en0 ifscope permanent [ethernet]
+      // Example router: MyRouterSSID (192.168.1.1) at 00:1a:2b:3c:4d:5e on en0 ifscope [ethernet]
+      
+      const ethMatch = line.match(
+        /^([\w\-]+(?:\.[\w\-]+)*) \(([0-9.]+)\) at ([0-9a-f:]+) on (\w+) ifscope(?: \w+)? \[ethernet\]/i
+      );
+      const generalMatch = line.match(
+        /^([\w\-]+(?:\.[\w\-]+)*) \(([0-9.]+)\) at ([0-9a-f:]+)/i
+      );
+      
+      const unixMatch = ethMatch || generalMatch;
+      if (unixMatch) {
+        hostnameOrSSID = unixMatch[1];
+        ip = unixMatch[2];
+        mac = unixMatch[3];
+        isEthernet = ethMatch ? true : false;
+        
+        match = { ip, mac, hostnameOrSSID, isEthernet };
+      }
+    }
 
     if (match) {
-      const hostnameOrSSID = match[1];
-      const ip = match[2];
-      const mac = match[3];
-      const isEthernet = ethMatch ? true : false; // Check if it was the ethernet-specific match
-
       let type = "computer"; // Default type
-      let name = hostnameOrSSID;
+      let name = match.hostnameOrSSID;
 
       // OS detection (simplified)
-      const osNameMatch = hostnameOrSSID.match(
+      const osNameMatch = match.hostnameOrSSID.match(
         /(iphone|android|windows|macbook|mac|ipad|linux|ubuntu|pixel|galaxy|samsung|xiaomi|huawei|oneplus|surface)/i
       );
       if (osNameMatch) {
@@ -643,28 +746,28 @@ function parseArpOutput(output) {
       }
 
       // Device type heuristics
-      if (ip.endsWith(".1")) {
+      if (match.ip.endsWith(".1")) {
         // Simplified router detection
         type = "router";
-        name = hostnameOrSSID; // SSID for router
-      } else if (isEthernet) {
+        name = match.hostnameOrSSID; // SSID for router
+      } else if (match.isEthernet) {
         type = "computer"; // Assume wired connections are computers/servers unless other heuristics apply
       } else if (
-        mac.toLowerCase().startsWith("a8:") || // Common MAC prefixes for smartphones
-        mac.toLowerCase().startsWith("ac:")
+        match.mac.toLowerCase().startsWith("a8:") || // Common MAC prefixes for smartphones
+        match.mac.toLowerCase().startsWith("ac:")
       ) {
         type = "smartphone";
       }
 
       // Avoid duplicates by IP address
-      if (!newDevices.some((d) => d.ip === ip)) {
+      if (!newDevices.some((d) => d.ip === match.ip)) {
         newDevices.push({
           id: `device-${Date.now()}-${newDevices.length}`,
           name,
-          ip,
-          mac,
+          ip: match.ip,
+          mac: match.mac,
           type,
-          isEthernet, // Store ethernet status
+          isEthernet: match.isEthernet,
           status: "online",
         });
       }
@@ -675,6 +778,10 @@ function parseArpOutput(output) {
 
 // Start server
 const PORT = process.env.PORT || 3003;
-server.listen(PORT, "192.168.1.173", () => {
-  console.log(`Server running on port ${PORT}`);
+const HOST = process.env.HOST || "0.0.0.0"; // Bind to all interfaces by default
+
+server.listen(PORT, HOST, () => {
+  console.log(`Server running on ${HOST}:${PORT}`);
+  console.log(`Platform: ${require('os').platform()}`);
+  console.log(`Access the application at: http://localhost:${PORT}`);
 });
