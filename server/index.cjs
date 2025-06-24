@@ -577,22 +577,22 @@ io.on("connection", (socket) => {
   // Handle device registration (users represent devices connecting to the website)
   socket.on("register-user", (userData) => {
     console.log("Device Data: ", userData);
-    // Use a unique identifier for the device (e.g., userData.id or userData.name)
-    // if (userData && !userData.name) return;
-    let userId = userData.id || `user-${Date.now()}`;
-    // Check if a device with the same name or id is already connected (regardless of device name)
-    let existingUser = users.find((u) => u.name === userData.name);
+    // Use a unique identifier for the device
+    let userId = userData.id || `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Check if this specific user ID is already connected (to handle reconnections)
+    let existingUser = users.find((u) => u.id === userData.id && userData.id);
     let user;
-    console.error("existingUser:", existingUser);
+    console.log("existingUser:", existingUser);
+    
     if (existingUser) {
-      // Prevent duplicate device registration (even if device name is different)
+      // Handle reconnection - update existing user status
       user = { ...existingUser, status: "online" };
-      // Update device in users array
-      const idx = users.findIndex((u) => u.name === user.name);
+      const idx = users.findIndex((u) => u.id === user.id);
       users[idx] = user;
       userId = user.id;
     } else {
-      // Add new device
+      // Add new device - each connection gets a unique entry
       user = {
         id: userId,
         name: userData.name || `Device-${users.length + 1}`,
@@ -601,8 +601,8 @@ io.on("connection", (socket) => {
       users.push(user);
     }
     
-    // Add the user to devices array if not already present
-    const existingDevice = devices.find(d => d.name === user.name);
+    // Add the user to devices array - each user gets a unique device entry
+    const existingDevice = devices.find(d => d.id === `device-user-${user.id}`);
     if (!existingDevice) {
       const newDevice = {
         id: `device-user-${user.id}`,
@@ -618,9 +618,9 @@ io.on("connection", (socket) => {
       // Notify all clients about the new device
       io.emit("device-update", [newDevice]);
     } else {
-      // Mark existing device as a website user
-      existingDevice.isWebsiteUser = true;
+      // Update existing device status for reconnection
       existingDevice.status = 'online';
+      existingDevice.isWebsiteUser = true;
     }
     
     // Map socket to userId (device ID)
@@ -640,8 +640,8 @@ io.on("connection", (socket) => {
       if (userIdx !== -1) {
         users[userIdx].status = "offline";
         
-        // Remove the user from devices array if they were added as a website user
-        const deviceIdx = devices.findIndex((d) => d.isWebsiteUser && d.name === users[userIdx].name);
+        // Remove the corresponding device from devices array
+        const deviceIdx = devices.findIndex((d) => d.id === `device-user-${userId}`);
         if (deviceIdx !== -1) {
           devices.splice(deviceIdx, 1);
         }
