@@ -1,14 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, X, Minimize2, Maximize2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from "react";
+import { Send, X, Minimize2, Maximize2 } from "lucide-react";
 
 interface Message {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
 }
 
 const Chatbot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -25,17 +25,20 @@ const Chatbot: React.FC = () => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const userMessage = { role: 'user' as const, content: input };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
+    const userMessage = { role: "user" as const, content: input };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3003/api'}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://192.168.1.1:3003/api"}/chat`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: input }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -43,28 +46,38 @@ const Chatbot: React.FC = () => {
 
       const text = await response.text();
       if (!text) {
-        throw new Error('Empty response from server');
+        throw new Error("Empty response from server");
       }
 
       const data = JSON.parse(text);
       if (!data || !data.response) {
-        throw new Error('Invalid response format');
+        throw new Error("Invalid response format");
       }
 
-      setMessages(prev => [...prev, { role: 'assistant', content: data.response }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: data.response },
+      ]);
     } catch (error) {
-      console.error('Error:', error);
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        content: 'Sorry, I encountered an error. Please try again.' 
-      }]);
+      console.error("Error:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Sorry, I encountered an error. Please try again.",
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className={`fixed bottom-4 right-4 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-all duration-300 ${isMinimized ? 'h-12' : 'h-96'}`}>
+    <div
+      className={`fixed bottom-4 right-4 w-72 bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden transition-all duration-300 ${
+        isMinimized ? "h-12" : "h-96"
+      }`}
+    >
       {/* Header */}
       <div className="bg-blue-600 dark:bg-blue-700 p-3 flex justify-between items-center">
         <h3 className="text-white font-medium">Network Assistant</h3>
@@ -92,14 +105,14 @@ const Chatbot: React.FC = () => {
               <div
                 key={index}
                 className={`mb-4 ${
-                  message.role === 'user' ? 'text-right' : 'text-left'
+                  message.role === "user" ? "text-right" : "text-left"
                 }`}
               >
                 <div
                   className={`inline-block p-3 rounded-lg ${
-                    message.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700'
+                    message.role === "user"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 dark:bg-gray-700"
                   }`}
                 >
                   {message.content}
@@ -111,8 +124,14 @@ const Chatbot: React.FC = () => {
                 <div className="inline-block p-3 rounded-lg bg-gray-100 dark:bg-gray-700">
                   <div className="flex space-x-2">
                     <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                    <div
+                      className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.2s" }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
+                      style={{ animationDelay: "0.4s" }}
+                    ></div>
                   </div>
                 </div>
               </div>
@@ -121,7 +140,10 @@ const Chatbot: React.FC = () => {
           </div>
 
           {/* Input */}
-          <form onSubmit={handleSubmit} className="p-4 border-t dark:border-gray-700">
+          <form
+            onSubmit={handleSubmit}
+            className="p-4 border-t dark:border-gray-700"
+          >
             <div className="flex space-x-2">
               <input
                 type="text"

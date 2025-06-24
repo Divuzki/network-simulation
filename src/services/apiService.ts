@@ -3,7 +3,7 @@ import { Device, User, Connection } from "../types";
 
 // API Service - these connect to real backend endpoints
 // Base API URL - points to your backend
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3003/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://192.168.1.1:3003/api";
 
 // Create axios instance
 const api = axios.create({

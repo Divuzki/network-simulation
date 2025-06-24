@@ -38,7 +38,7 @@ const chatbotResponses = {
   scan: "The scan feature discovers devices on your local network. Click the 'Scan Network' button to find devices connected to your network.",
   metrics:
     "Network metrics include upload/download speed, latency, packet loss, and throughput. These metrics help you understand the performance of your network connections.",
-    wan: "WAN (Wide Area Network) connects networks that are geographically far away. This application supports visualization of WAN connections.",
+  wan: "WAN (Wide Area Network) connects networks that are geographically far away. This application supports visualization of WAN connections.",
   default:
     "I'm a simple network assistant. I can help with basic network concepts and how to use this application. Try asking about network topology, connections, or specific features.",
 };
@@ -65,7 +65,7 @@ app.post("/api/chat", async (req, res) => {
   try {
     const { message } = req.body;
     const lowercaseMessage = message.toLowerCase();
-    
+
     let response = chatbotResponses.default;
 
     // Check for keywords in the message
@@ -106,29 +106,41 @@ async function getRealNetworkMetrics(entityId) {
     try {
       const os = require("os");
       let speedtestCommand;
-      
+
       // Try different speedtest commands based on platform
       if (os.platform() === "win32") {
         // On Windows, try speedtest.exe (official Ookla CLI) first, then speedtest-cli
         try {
-          const { stdout: speedtestOut } = await execAsync("speedtest --format=json");
+          const { stdout: speedtestOut } = await execAsync(
+            "speedtest --format=json"
+          );
           const speedData = JSON.parse(speedtestOut);
-          
+
           if (speedData && speedData.download && speedData.download.bandwidth) {
             // Official Ookla CLI returns bandwidth in bytes/sec
-            downloadSpeed = parseFloat((speedData.download.bandwidth * 8 / 1000000).toFixed(2)); // Convert to Mbps
+            downloadSpeed = parseFloat(
+              ((speedData.download.bandwidth * 8) / 1000000).toFixed(2)
+            ); // Convert to Mbps
           }
           if (speedData && speedData.upload && speedData.upload.bandwidth) {
-            uploadSpeed = parseFloat((speedData.upload.bandwidth * 8 / 1000000).toFixed(2)); // Convert to Mbps
+            uploadSpeed = parseFloat(
+              ((speedData.upload.bandwidth * 8) / 1000000).toFixed(2)
+            ); // Convert to Mbps
           }
         } catch (ooklaErr) {
-          console.log(`Official speedtest CLI not available, trying speedtest-cli: ${ooklaErr.message}`);
+          console.log(
+            `Official speedtest CLI not available, trying speedtest-cli: ${ooklaErr.message}`
+          );
           // Fallback to speedtest-cli
-          const { stdout: speedtestCliOut } = await execAsync("speedtest-cli --json");
+          const { stdout: speedtestCliOut } = await execAsync(
+            "speedtest-cli --json"
+          );
           const speedData = JSON.parse(speedtestCliOut);
-          
+
           if (speedData && speedData.download) {
-            downloadSpeed = parseFloat((speedData.download / 1000000).toFixed(2)); // Convert to Mbps
+            downloadSpeed = parseFloat(
+              (speedData.download / 1000000).toFixed(2)
+            ); // Convert to Mbps
           }
           if (speedData && speedData.upload) {
             uploadSpeed = parseFloat((speedData.upload / 1000000).toFixed(2)); // Convert to Mbps
@@ -136,9 +148,11 @@ async function getRealNetworkMetrics(entityId) {
         }
       } else {
         // Unix/Linux/macOS: use speedtest-cli
-        const { stdout: speedtestCliOut } = await execAsync("speedtest-cli --json");
+        const { stdout: speedtestCliOut } = await execAsync(
+          "speedtest-cli --json"
+        );
         const speedData = JSON.parse(speedtestCliOut);
-        
+
         if (speedData && speedData.download) {
           downloadSpeed = parseFloat((speedData.download / 1000000).toFixed(2)); // Convert to Mbps
         }
@@ -154,7 +168,9 @@ async function getRealNetworkMetrics(entityId) {
       );
     } catch (err) {
       console.error(`Speedtest error for ${entityId}: ${err.message}`);
-      console.log(`Note: Make sure speedtest CLI is installed. On Windows: 'winget install Ookla.Speedtest.CLI' or 'pip install speedtest-cli'`);
+      console.log(
+        `Note: Make sure speedtest CLI is installed. On Windows: 'winget install Ookla.Speedtest.CLI' or 'pip install speedtest-cli'`
+      );
       speedTestCache.data = null;
       speedTestCache.timestamp = 0;
       // Set fallback values to indicate speedtest is not available
@@ -233,7 +249,9 @@ async function getRealNetworkMetrics(entityId) {
     // Parse packet loss based on OS
     if (os.platform() === "win32") {
       // Windows: "(25% loss)" or "Packets: Sent = 4, Received = 3, Lost = 1 (25% loss)"
-      const lossMatch = pingOut.match(/\((\d+)% loss\)/i) || pingOut.match(/Lost = \d+ \((\d+)% loss\)/i);
+      const lossMatch =
+        pingOut.match(/\((\d+)% loss\)/i) ||
+        pingOut.match(/Lost = \d+ \((\d+)% loss\)/i);
       if (lossMatch && lossMatch[1]) {
         packetLoss = parseFloat(lossMatch[1]);
       }
@@ -347,30 +365,30 @@ app.post("/api/scan", (req, res) => {
     }
     // Parse arp -a output
     const newDevices = parseArpOutput(stdout);
-    
+
     // Add connected website users as devices if they're not already detected
-    const onlineUsers = users.filter(u => u.status === 'online');
+    const onlineUsers = users.filter((u) => u.status === "online");
     for (const user of onlineUsers) {
       // Check if this user is already in the scanned devices (by name)
-      const existingDevice = newDevices.find(d => d.name === user.name);
+      const existingDevice = newDevices.find((d) => d.name === user.name);
       if (!existingDevice) {
         // Add the connected user as a device
         newDevices.push({
           id: `device-user-${user.id}`,
           name: user.name,
-          ip: 'Connected to Website', // Placeholder since we don't have their IP
-          mac: 'N/A',
-          type: 'computer',
+          ip: "Connected to Website", // Placeholder since we don't have their IP
+          mac: "N/A",
+          type: "computer",
           isEthernet: false,
-          status: 'online',
-          isWebsiteUser: true // Flag to identify website-connected users
+          status: "online",
+          isWebsiteUser: true, // Flag to identify website-connected users
         });
       } else {
         // Mark existing device as a website user
         existingDevice.isWebsiteUser = true;
       }
     }
-    
+
     // Remove duplicates from global devices array by name
     for (const device of newDevices) {
       const existingIdx = devices.findIndex((d) => d.name === device.name);
@@ -578,13 +596,15 @@ io.on("connection", (socket) => {
   socket.on("register-user", (userData) => {
     console.log("Device Data: ", userData);
     // Use a unique identifier for the device
-    let userId = userData.id || `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
+    let userId =
+      userData.id ||
+      `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     // Check if this specific user ID is already connected (to handle reconnections)
     let existingUser = users.find((u) => u.id === userData.id && userData.id);
     let user;
     console.log("existingUser:", existingUser);
-    
+
     if (existingUser) {
       // Handle reconnection - update existing user status
       user = { ...existingUser, status: "online" };
@@ -600,29 +620,31 @@ io.on("connection", (socket) => {
       };
       users.push(user);
     }
-    
+
     // Add the user to devices array - each user gets a unique device entry
-    const existingDevice = devices.find(d => d.id === `device-user-${user.id}`);
+    const existingDevice = devices.find(
+      (d) => d.id === `device-user-${user.id}`
+    );
     if (!existingDevice) {
       const newDevice = {
         id: `device-user-${user.id}`,
         name: user.name,
-        ip: 'Connected to Website',
-        mac: 'N/A',
-        type: 'computer',
+        ip: "Connected to Website",
+        mac: "N/A",
+        type: "computer",
         isEthernet: false,
-        status: 'online',
-        isWebsiteUser: true
+        status: "online",
+        isWebsiteUser: true,
       };
       devices.push(newDevice);
       // Notify all clients about the new device
       io.emit("device-update", [newDevice]);
     } else {
       // Update existing device status for reconnection
-      existingDevice.status = 'online';
+      existingDevice.status = "online";
       existingDevice.isWebsiteUser = true;
     }
-    
+
     // Map socket to userId (device ID)
     socketUserMap.set(socket.id, userId);
     // Acknowledge registration with device data
@@ -639,9 +661,11 @@ io.on("connection", (socket) => {
       const userIdx = users.findIndex((u) => u.id === userId);
       if (userIdx !== -1) {
         users[userIdx].status = "offline";
-        
+
         // Remove the corresponding device from devices array
-        const deviceIdx = devices.findIndex((d) => d.id === `device-user-${userId}`);
+        const deviceIdx = devices.findIndex(
+          (d) => d.id === `device-user-${userId}`
+        );
         if (deviceIdx !== -1) {
           devices.splice(deviceIdx, 1);
         }
@@ -675,60 +699,65 @@ function parseArpOutput(output) {
   const os = require("os");
   const lines = output.split(os.platform() === "win32" ? "\r\n" : "\n");
   const newDevices = [];
-  
+
   for (const line of lines) {
     let match = null;
     let ip = null;
     let mac = null;
     let hostnameOrSSID = null;
     let isEthernet = false;
-    
+
     if (os.platform() === "win32") {
       // Windows ARP output format:
       // Interface: 192.168.1.173 --- 0x4
       //   Internet Address      Physical Address      Type
       //   192.168.1.1           00-1a-2b-3c-4d-5e     dynamic
       //   192.168.1.100         a4-83-e7-68-e2-30     dynamic
-      
+
       // Skip header lines
-      if (line.includes("Interface:") || line.includes("Internet Address") || line.includes("---") || line.trim() === "") {
+      if (
+        line.includes("Interface:") ||
+        line.includes("Internet Address") ||
+        line.includes("---") ||
+        line.trim() === ""
+      ) {
         continue;
       }
-      
+
       // Match Windows ARP format: IP address followed by MAC address
       const winMatch = line.match(/^\s*([0-9.]+)\s+([0-9a-f-]+)\s+(\w+)/i);
       if (winMatch) {
         ip = winMatch[1];
         mac = winMatch[2].replace(/-/g, ":"); // Convert Windows MAC format (xx-xx-xx) to standard (xx:xx:xx)
         const type = winMatch[3];
-        
+
         // Try to resolve hostname (simplified - in real implementation you might want to do reverse DNS)
-        hostnameOrSSID = `Device-${ip.split('.').pop()}`; // Use last octet as simple identifier
-        
+        hostnameOrSSID = `Device-${ip.split(".").pop()}`; // Use last octet as simple identifier
+
         // Windows doesn't easily show ethernet vs wifi in ARP, so we'll assume dynamic entries could be either
         isEthernet = false; // Default to false since we can't easily determine this from Windows ARP
-        
+
         match = { ip, mac, hostnameOrSSID, isEthernet };
       }
     } else {
       // Unix/macOS ARP output format:
       // Example: divines-mbp (192.168.1.173) at a4:83:e7:68:e2:30 on en0 ifscope permanent [ethernet]
       // Example router: MyRouterSSID (192.168.1.1) at 00:1a:2b:3c:4d:5e on en0 ifscope [ethernet]
-      
+
       const ethMatch = line.match(
         /^([\w\-]+(?:\.[\w\-]+)*) \(([0-9.]+)\) at ([0-9a-f:]+) on (\w+) ifscope(?: \w+)? \[ethernet\]/i
       );
       const generalMatch = line.match(
         /^([\w\-]+(?:\.[\w\-]+)*) \(([0-9.]+)\) at ([0-9a-f:]+)/i
       );
-      
+
       const unixMatch = ethMatch || generalMatch;
       if (unixMatch) {
         hostnameOrSSID = unixMatch[1];
         ip = unixMatch[2];
         mac = unixMatch[3];
         isEthernet = ethMatch ? true : false;
-        
+
         match = { ip, mac, hostnameOrSSID, isEthernet };
       }
     }
@@ -782,6 +811,6 @@ const HOST = process.env.HOST || "0.0.0.0"; // Bind to all interfaces by default
 
 server.listen(PORT, HOST, () => {
   console.log(`Server running on ${HOST}:${PORT}`);
-  console.log(`Platform: ${require('os').platform()}`);
-  console.log(`Access the application at: http://localhost:${PORT}`);
+  console.log(`Platform: ${require("os").platform()}`);
+  console.log(`Access the application at: http://192.168.1.1:${PORT}`);
 });
