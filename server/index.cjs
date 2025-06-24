@@ -616,32 +616,20 @@ io.on("connection", (socket) => {
       users[idx] = user;
       userId = user.id;
     } else {
-      // Check for duplicate by name to prevent multiple users with same device name
-      const duplicateByName = users.find(
-        (u) => u.name === userData.name && userData.name
-      );
-      if (duplicateByName) {
-        // Use existing user but update status
-        user = { ...duplicateByName, status: "online" };
-        const idx = users.findIndex((u) => u.id === duplicateByName.id);
-        users[idx] = user;
-        userId = user.id;
-      } else {
-        // Add new device - each connection gets a unique entry
-        user = {
-          id: userId,
-          name: userData.name || `Device-${users.length + 1}`,
-          status: "online",
-        };
-        users.push(user);
-      }
+      // Add new device - each connection gets a unique entry
+      // Use the actual device name from userData, or generate a meaningful fallback
+      const deviceName = userData.name || userData.deviceName || `Web User ${users.length + 1}`;
+      user = {
+        id: userId,
+        name: deviceName,
+        status: "online",
+      };
+      users.push(user);
     }
 
-    // Add the user to devices array - prevent duplicates by checking both device ID and name
+    // Add the user to devices array - prevent duplicates by checking device ID only
     let existingDevice = devices.find(
-      (d) =>
-        d.id === `device-user-${user.id}` ||
-        (d.name === user.name && d.isWebsiteUser)
+      (d) => d.id === `device-user-${user.id}`
     );
 
     if (!existingDevice) {

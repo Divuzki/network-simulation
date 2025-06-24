@@ -72,9 +72,27 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
           return userId;
         };
 
+        // Create a more descriptive name for the user
+        const getUserName = () => {
+          if (deviceName) {
+            return deviceName;
+          }
+          // Fallback to browser/platform info
+          const platform = navigator.platform || 'Unknown';
+          const userAgent = navigator.userAgent;
+          let browserName = 'Browser';
+          
+          if (userAgent.includes('Chrome')) browserName = 'Chrome';
+          else if (userAgent.includes('Firefox')) browserName = 'Firefox';
+          else if (userAgent.includes('Safari')) browserName = 'Safari';
+          else if (userAgent.includes('Edge')) browserName = 'Edge';
+          
+          return `${browserName} on ${platform}`;
+        };
+
         const defaultUser: User = {
           id: getUserId(),
-          name: deviceName ?? null,
+          name: getUserName(),
           status: "online",
         };
 
@@ -150,7 +168,7 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         
         const usersWithMetrics = usersResponse.data.map((u: User) => ({
           ...u,
-          networkMetrics: u.networkMetrics || null,
+          networkMetrics: u.networkMetrics || undefined,
         }));
         setUsers(usersWithMetrics);
       } catch (error) {
