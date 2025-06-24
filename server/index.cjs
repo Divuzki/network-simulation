@@ -391,19 +391,21 @@ app.post("/api/scan", (req, res) => {
 
     // Remove duplicates from global devices array by IP and MAC address (more reliable than name)
     for (const device of newDevices) {
-      const existingIdx = devices.findIndex((d) => 
-        (d.ip === device.ip && d.ip !== "Connected to Website") || 
-        (d.mac === device.mac && d.mac !== "N/A")
+      const existingIdx = devices.findIndex(
+        (d) =>
+          (d.ip === device.ip && d.ip !== "Connected to Website") ||
+          (d.mac === device.mac && d.mac !== "N/A")
       );
       if (existingIdx === -1) {
         devices.push(device);
       } else {
         // Update the device info, preserving important flags and using the actual device name
-        const updatedDevice = { 
-          ...devices[existingIdx], 
+        const updatedDevice = {
+          ...devices[existingIdx],
           ...device,
           // Preserve website user flag if it exists
-          isWebsiteUser: devices[existingIdx].isWebsiteUser || device.isWebsiteUser
+          isWebsiteUser:
+            devices[existingIdx].isWebsiteUser || device.isWebsiteUser,
         };
         devices[existingIdx] = updatedDevice;
       }
@@ -622,7 +624,9 @@ io.on("connection", (socket) => {
       userId = user.id;
     } else {
       // Check for duplicate by name to prevent multiple users with same device name
-      const duplicateByName = users.find((u) => u.name === userData.name && userData.name);
+      const duplicateByName = users.find(
+        (u) => u.name === userData.name && userData.name
+      );
       if (duplicateByName) {
         // Use existing user but update status
         user = { ...duplicateByName, status: "online" };
@@ -642,9 +646,11 @@ io.on("connection", (socket) => {
 
     // Add the user to devices array - prevent duplicates by checking both device ID and name
     let existingDevice = devices.find(
-      (d) => d.id === `device-user-${user.id}` || (d.name === user.name && d.isWebsiteUser)
+      (d) =>
+        d.id === `device-user-${user.id}` ||
+        (d.name === user.name && d.isWebsiteUser)
     );
-    
+
     if (!existingDevice) {
       const newDevice = {
         id: `device-user-${user.id}`,
@@ -733,7 +739,7 @@ function parseArpOutput(output) {
       // Windows ARP output format:
       // Interface: 192.168.1.173 --- 0x4
       //   Internet Address      Physical Address      Type
-      //   192.168.1.1           00-1a-2b-3c-4d-5e     dynamic
+      //   192.168.1.173           00-1a-2b-3c-4d-5e     dynamic
       //   192.168.1.100         a4-83-e7-68-e2-30     dynamic
 
       // Skip header lines
@@ -764,7 +770,7 @@ function parseArpOutput(output) {
     } else {
       // Unix/macOS ARP output format:
       // Example: divines-mbp (192.168.1.173) at a4:83:e7:68:e2:30 on en0 ifscope permanent [ethernet]
-      // Example router: MyRouterSSID (192.168.1.1) at 00:1a:2b:3c:4d:5e on en0 ifscope [ethernet]
+      // Example router: MyRouterSSID (192.168.1.173) at 00:1a:2b:3c:4d:5e on en0 ifscope [ethernet]
 
       const ethMatch = line.match(
         /^([\w\-]+(?:\.[\w\-]+)*) \(([0-9.]+)\) at ([0-9a-f:]+) on (\w+) ifscope(?: \w+)? \[ethernet\]/i
@@ -834,5 +840,5 @@ const HOST = process.env.HOST || "0.0.0.0"; // Bind to all interfaces by default
 server.listen(PORT, HOST, () => {
   console.log(`Server running on ${HOST}:${PORT}`);
   console.log(`Platform: ${require("os").platform()}`);
-  console.log(`Access the application at: http://192.168.1.1:${PORT}`);
+  console.log(`Access the application at: http://192.168.1.173:${PORT}`);
 });
