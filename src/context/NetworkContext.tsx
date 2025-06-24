@@ -103,11 +103,21 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
       setDevices((prev) => {
         const uniqueDevices = [...prev];
         updatedDevices.forEach((device) => {
+          // Check for duplicates by ID, IP, or MAC address (more robust deduplication)
           const existingIndex = uniqueDevices.findIndex(
-            (d) => d.id === device.id
+            (d) => 
+              d.id === device.id ||
+              (d.ip === device.ip && device.ip !== "Connected to Website") ||
+              (d.mac === device.mac && device.mac !== "N/A")
           );
           if (existingIndex >= 0) {
-            uniqueDevices[existingIndex] = { ...device };
+            // Update existing device, preserving important properties
+            uniqueDevices[existingIndex] = {
+              ...uniqueDevices[existingIndex],
+              ...device,
+              // Ensure the device name is properly displayed (not an ID)
+              name: device.name || uniqueDevices[existingIndex].name
+            };
           } else {
             uniqueDevices.push(device);
           }
