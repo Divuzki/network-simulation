@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Link, User, AlertTriangle, Activity, Zap } from "lucide-react";
 import { useNetwork } from "../../context/NetworkContext";
+import { User as UserType, Connection } from "../../types";
 
 interface ConnectionModalProps {
   onClose: () => void;
@@ -16,7 +17,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
     testConnectionBetweenUsers,
   } = useNetwork();
   const [selectedUser, setSelectedUser] = useState<string>("");
-  const [selectedUserMetrics, setSelectedUserMetrics] = useState<any>(null);
+  const [selectedUserMetrics, setSelectedUserMetrics] = useState<UserType['networkMetrics'] | null>(null);
   const [connectionType, setConnectionType] = useState<"P2P" | "LAN" | "WAN">(
     "P2P"
   );
@@ -90,7 +91,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
   };
 
   // Get the other user in a connection
-  const getOtherUserInConnection = (connection: any) => {
+  const getOtherUserInConnection = (connection: Connection) => {
     if (!currentUser) return null;
     const otherUserId =
       connection.sourceId === currentUser.id
@@ -455,7 +456,8 @@ const ConnectionTypeButton: React.FC<ConnectionTypeButtonProps> = ({
 };
 
 // Helper functions for connection quality
-const getConnectionQualityPercentage = (metrics: any): number => {
+const getConnectionQualityPercentage = (metrics: UserType['networkMetrics']): number => {
+  if (!metrics) return 0;
   // Calculate a quality score based on download speed, upload speed, and latency
   const downloadScore = Math.min(metrics.downloadSpeed / 100, 1) * 40; // 40% weight
   const uploadScore = Math.min(metrics.uploadSpeed / 50, 1) * 30; // 30% weight
@@ -465,7 +467,7 @@ const getConnectionQualityPercentage = (metrics: any): number => {
   return Math.min(Math.round(downloadScore + uploadScore + latencyScore), 100);
 };
 
-const getConnectionQualityColor = (metrics: any): string => {
+const getConnectionQualityColor = (metrics: UserType['networkMetrics']): string => {
   const quality = getConnectionQualityPercentage(metrics);
   if (quality >= 80) return "bg-green-500";
   if (quality >= 60) return "bg-blue-500";
@@ -474,7 +476,7 @@ const getConnectionQualityColor = (metrics: any): string => {
   return "bg-red-500";
 };
 
-const getConnectionQualityLabel = (metrics: any): string => {
+const getConnectionQualityLabel = (metrics: UserType['networkMetrics']): string => {
   const quality = getConnectionQualityPercentage(metrics);
   if (quality >= 80) return "Excellent";
   if (quality >= 60) return "Good";
