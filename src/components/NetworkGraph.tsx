@@ -130,8 +130,8 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({ onEducationClick }) => {
         const edgeId = params.edges[0];
         const edge = edges.get(edgeId);
 
-        if (edge && edge.label) {
-          onEducationClick(edge.label.toLowerCase());
+        if (edge && (edge as any).label) {
+          onEducationClick((edge as any).label.toLowerCase());
         }
       }
     });
@@ -162,8 +162,9 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({ onEducationClick }) => {
     const network = networkRef.current;
 
     // Update nodes and edges when data changes
-    const nodes = (network as any).body.data.nodes;
-    const edges = (network as any).body.data.edges;
+    const networkBody = (network as any).body;
+    const nodes = networkBody.data.nodes;
+    const edges = networkBody.data.edges;
 
     // Update nodes
     const currentNodeIds = new Set(nodes.getIds());
@@ -272,7 +273,7 @@ const DeviceInfo: React.FC<{ deviceId: string }> = ({ deviceId }) => {
     latency: number;
     packetLoss?: number;
     throughput?: number;
-    jitter?: number;
+    actualBandwidth?: number;
     maxBandwidth?: number;
   } | null>(null);
   const [bandwidth, setBandwidth] = React.useState<{
@@ -423,7 +424,7 @@ const DeviceInfo: React.FC<{ deviceId: string }> = ({ deviceId }) => {
                     Bandwidth
                   </div>
                   <div className="font-bold text-purple-600 dark:text-purple-400">
-                    {bandwidth.maxBandwidth}
+                    {(bandwidth as any).maxBandwidth || 'N/A'}
                     <span className="text-xs ml-1">Mbps</span>
                   </div>
                 </div>
@@ -450,8 +451,8 @@ const DeviceInfo: React.FC<{ deviceId: string }> = ({ deviceId }) => {
                 color="green"
               />
               <MetricCard
-                label="Jitter"
-                value={metrics.jitter ? `${metrics.jitter} ms` : "N/A"}
+                label="Actual Bandwidth"
+                value={metrics.actualBandwidth ? `${metrics.actualBandwidth} Mbps` : "N/A"}
                 color="purple"
               />
             </div>
@@ -492,7 +493,7 @@ const UserInfo: React.FC<{ userId: string }> = ({ userId }) => {
     latency: number;
     packetLoss?: number;
     throughput?: number;
-    jitter?: number;
+    actualBandwidth?: number;
     maxBandwidth?: number;
   } | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -645,7 +646,7 @@ const getQualityPercentage = (metrics: {
   latency: number;
   packetLoss?: number;
   throughput?: number;
-  jitter?: number;
+  actualBandwidth?: number;
   maxBandwidth?: number;
 }): number => {
   // Calculate a quality score based on download speed, upload speed, and latency
@@ -663,7 +664,7 @@ const getQualityColor = (metrics: {
   latency: number;
   packetLoss?: number;
   throughput?: number;
-  jitter?: number;
+  actualBandwidth?: number;
   maxBandwidth?: number;
 }): string => {
   const quality = getQualityPercentage(metrics);
@@ -680,7 +681,7 @@ const getQualityLabel = (metrics: {
   latency: number;
   packetLoss?: number;
   throughput?: number;
-  jitter?: number;
+  actualBandwidth?: number;
   maxBandwidth?: number;
 }): string => {
   const quality = getQualityPercentage(metrics);

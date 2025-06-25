@@ -57,9 +57,37 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
     // Get device name to use as username
     getDevices()
       .then((response) => {
-        // Find this device or use a default name
-        const thisDevice =
-          response.data.find((d) => d.type === "computer") || response.data[0];
+        // Find this device by looking for the local machine
+        // Always prioritize actual device names over browser info
+        let thisDevice = null;
+        
+        // First: Try to find any online computer that's not a website user
+        thisDevice = response.data.find((d) => 
+          d.type === "computer" && 
+          d.status === "online" && 
+          !d.isWebsiteUser
+        );
+        
+        // Second: If no online computer, try any computer device
+        if (!thisDevice) {
+          thisDevice = response.data.find((d) => d.type === "computer");
+        }
+        
+        // Third: Try any device that has a meaningful name (not generic)
+        if (!thisDevice) {
+          thisDevice = response.data.find((d) => 
+            d.name && 
+            !d.name.toLowerCase().includes('unknown') &&
+            !d.name.toLowerCase().includes('device') &&
+            d.name.length > 3
+          );
+        }
+        
+        // Fourth: Use any available device
+        if (!thisDevice && response.data.length > 0) {
+          thisDevice = response.data[0];
+        }
+        
         const deviceName = thisDevice && thisDevice.name;
 
         // Create user with device name and persistent ID
@@ -74,20 +102,23 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
 
         // Create a more descriptive name for the user
         const getUserName = () => {
-          if (deviceName) {
-            return deviceName;
+          // Always prioritize actual device name
+          if (deviceName && deviceName.trim()) {
+            return deviceName.trim();
           }
-          // Fallback to browser/platform info
-          const platform = navigator.platform || 'Unknown';
-          const userAgent = navigator.userAgent;
-          let browserName = 'Browser';
           
-          if (userAgent.includes('Chrome')) browserName = 'Chrome';
-          else if (userAgent.includes('Firefox')) browserName = 'Firefox';
-          else if (userAgent.includes('Safari')) browserName = 'Safari';
-          else if (userAgent.includes('Edge')) browserName = 'Edge';
+          // Try to get hostname as device name
+          try {
+            const hostname = window.location.hostname;
+            if (hostname && hostname !== 'localhost' && hostname !== '127.0.0.1') {
+              return hostname.split('.')[0];
+            }
+          } catch (e) {
+            console.warn('Could not get hostname:', e);
+          }
           
-          return `${browserName} on ${platform}`;
+          // Last resort: use a generic name with timestamp to avoid browser info
+          return `Device-${Date.now().toString().slice(-6)}`;
         };
 
         const defaultUser: User = {

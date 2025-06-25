@@ -316,13 +316,13 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({ onClose }) => {
                       {selectedUserMetrics.latency} ms
                     </span>
                   </div>
-                  {selectedUserMetrics.jitter && (
+                  {selectedUserMetrics.actualBandwidth && (
                     <div>
                       <span className="block text-xs uppercase tracking-wider text-gray-500">
-                        Jitter
+                        Actual Bandwidth
                       </span>
                       <span className="font-bold text-orange-600 dark:text-orange-400">
-                        {selectedUserMetrics.jitter} ms
+                        {selectedUserMetrics.actualBandwidth} Mbps
                       </span>
                     </div>
                   )}

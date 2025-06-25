@@ -21,7 +21,7 @@ export interface User {
     latency: number;
     packetLoss?: number;
     throughput?: number;
-    jitter?: number;
+    actualBandwidth?: number;
     maxBandwidth?: number;
   };
 }
