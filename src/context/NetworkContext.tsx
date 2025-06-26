@@ -273,12 +273,26 @@ export const NetworkProvider: React.FC<{ children: ReactNode }> = ({
         }
       }
 
+      // Check for existing connections
       const existingConnection = connections.find(
         (conn) =>
           (conn.sourceId === currentUser.id && conn.targetId === userId) ||
           (conn.sourceId === userId && conn.targetId === currentUser.id)
       );
 
+      // For WAN connections, allow connection even if other types exist
+      // but prevent duplicate connections of the same type
+      if (connectionType === "WAN") {
+        const existingWANConnection = connections.find(
+          (conn) =>
+            conn.type === "WAN" &&
+            ((conn.sourceId === currentUser.id && conn.targetId === userId) ||
+             (conn.sourceId === userId && conn.targetId === currentUser.id))
+        );
+        return !existingWANConnection;
+      }
+
+      // For P2P and LAN, prevent any existing connection
       return !existingConnection;
     },
     [connections, currentUser, users]

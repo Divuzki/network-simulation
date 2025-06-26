@@ -46781,7 +46781,7 @@ function Nf(e, r) {
   );
 }
 Object.assign(Nf, { Manager: _b, Socket: Wj, io: Nf, connect: Nf });
-const fPe = () => Nf("http://192.168.1.173:3003");
+const fPe = () => Nf("http://192.168.0.173:3003");
 function Vj(e, r) {
   return function () {
     return e.apply(r, arguments);
@@ -48939,7 +48939,7 @@ Me.formToJSON = (e) => aF(O.isHTMLForm(e) ? new FormData(e) : e);
 Me.getAdapter = fF.getAdapter;
 Me.HttpStatusCode = Ob;
 Me.default = Me;
-const HCe = "http://192.168.1.173:3003/api",
+const HCe = "http://192.168.0.173:3003/api",
   fi = Me.create({
     baseURL: HCe,
     headers: { "Content-Type": "application/json" },
@@ -50249,7 +50249,7 @@ const HCe = "http://192.168.1.173:3003/api",
       const f = { role: "user", content: t };
       r((h) => [...h, f]), n(""), a(!0);
       try {
-        const h = await fetch("http://192.168.1.173:3003/api/chat", {
+        const h = await fetch("http://192.168.0.173:3003/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: t }),

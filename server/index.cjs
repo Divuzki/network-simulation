@@ -168,13 +168,15 @@ async function getRealNetworkMetrics(entityId) {
       );
     } catch (err) {
       console.error(`Speedtest error for ${entityId}: ${err.message}`);
-      
+
       // Check if it's a 403 Forbidden error (rate limiting)
-      if (err.message.includes('403') || err.message.includes('Forbidden')) {
-        console.log(`Rate limited by speedtest service. Using simulated values for ${entityId}`);
+      if (err.message.includes("403") || err.message.includes("Forbidden")) {
+        console.log(
+          `Rate limited by speedtest service. Using simulated values for ${entityId}`
+        );
         // Provide simulated realistic values when rate limited
         downloadSpeed = Math.floor(Math.random() * 50) + 25; // 25-75 Mbps
-        uploadSpeed = Math.floor(Math.random() * 20) + 10;   // 10-30 Mbps
+        uploadSpeed = Math.floor(Math.random() * 20) + 10; // 10-30 Mbps
         speedTestCache.data = { downloadSpeed, uploadSpeed };
         speedTestCache.timestamp = currentTime;
       } else {
@@ -293,9 +295,10 @@ async function getRealNetworkMetrics(entityId) {
   }
 
   // Calculate actual bandwidth as the average of upload and download speeds
-  const actualBandwidth = (uploadSpeed !== null && downloadSpeed !== null) 
-    ? parseFloat(((uploadSpeed + downloadSpeed) / 2).toFixed(2)) 
-    : null;
+  const actualBandwidth =
+    uploadSpeed !== null && downloadSpeed !== null
+      ? parseFloat(((uploadSpeed + downloadSpeed) / 2).toFixed(2))
+      : null;
 
   return {
     uploadSpeed:
@@ -433,7 +436,7 @@ app.post("/api/scan", (req, res) => {
     }
     // Helper function to check if a name is generic/placeholder (same as in registration)
     const isGenericName = (name) => {
-      if (!name || typeof name !== 'string') return true;
+      if (!name || typeof name !== "string") return true;
       const genericPatterns = [
         /^\d+$/, // Just numbers like "192"
         /Chrome.*on.*/, // Browser info like "Chrome on MacIntel"
@@ -444,24 +447,29 @@ app.post("/api/scan", (req, res) => {
         /^Computer$/, // Just "Computer"
         /^Unknown/, // Unknown devices
       ];
-      return genericPatterns.some(pattern => pattern.test(name)) || name.length < 3;
+      return (
+        genericPatterns.some((pattern) => pattern.test(name)) || name.length < 3
+      );
     };
-    
+
     // Update user names if we found matching devices by IP
     const updatedUsers = [];
     for (const user of users) {
-      if (user.clientIP && user.status === 'online') {
-        const matchingDevice = newDevices.find(d => 
-          d.ip === user.clientIP && !d.isWebsiteUser && !isGenericName(d.name)
+      if (user.clientIP && user.status === "online") {
+        const matchingDevice = newDevices.find(
+          (d) =>
+            d.ip === user.clientIP && !d.isWebsiteUser && !isGenericName(d.name)
         );
         if (matchingDevice && isGenericName(user.name)) {
           user.name = matchingDevice.name;
           updatedUsers.push(user);
-          console.log(`Updated user name for IP ${user.clientIP}: ${user.name}`);
+          console.log(
+            `Updated user name for IP ${user.clientIP}: ${user.name}`
+          );
         }
       }
     }
-    
+
     // Notify all clients
     io.emit("device-update", newDevices);
     if (updatedUsers.length > 0) {
@@ -606,10 +614,28 @@ app.post("/api/connect", (req, res) => {
       (conn.sourceId === userId && conn.targetId === sourceId)
   );
 
-  if (existingConnection) {
-    return res
-      .status(400)
-      .json({ error: "Connection already exists between these devices" });
+  // For WAN connections, allow connection even if other types exist
+  // but prevent duplicate connections of the same type
+  if (connectionType === "WAN") {
+    const existingWANConnection = connections.find(
+      (conn) =>
+        conn.type === "WAN" &&
+        ((conn.sourceId === sourceId && conn.targetId === userId) ||
+         (conn.sourceId === userId && conn.targetId === sourceId))
+    );
+    
+    if (existingWANConnection) {
+      return res
+        .status(400)
+        .json({ error: "WAN connection already exists between these devices" });
+    }
+  } else {
+    // For P2P and LAN, prevent any existing connection
+    if (existingConnection) {
+      return res
+        .status(400)
+        .json({ error: "Connection already exists between these devices" });
+    }
   }
 
   // Create new connection
@@ -654,17 +680,20 @@ io.on("connection", (socket) => {
   // Handle device registration (users represent devices connecting to the website)
   socket.on("register-user", (userData) => {
     console.log("Device Data: ", userData);
-    
+
     // Get client's IP address
-    const clientIP = socket.handshake.address || 
-                    socket.request.connection.remoteAddress ||
-                    socket.request.socket.remoteAddress ||
-                    (socket.request.connection.socket ? socket.request.connection.socket.remoteAddress : null);
-    
+    const clientIP =
+      socket.handshake.address ||
+      socket.request.connection.remoteAddress ||
+      socket.request.socket.remoteAddress ||
+      (socket.request.connection.socket
+        ? socket.request.connection.socket.remoteAddress
+        : null);
+
     // Clean up IPv6-mapped IPv4 addresses
-    const cleanIP = clientIP ? clientIP.replace(/^::ffff:/, '') : null;
+    const cleanIP = clientIP ? clientIP.replace(/^::ffff:/, "") : null;
     console.log("Client IP:", cleanIP);
-    
+
     // Use a unique identifier for the device
     let userId =
       userData.id ||
@@ -685,10 +714,10 @@ io.on("connection", (socket) => {
       // Add new device - each connection gets a unique entry
       // First try to match with scanned devices by IP
       let deviceName = userData.name || userData.deviceName;
-      
+
       // Helper function to check if a name is generic/placeholder
       const isGenericName = (name) => {
-        if (!name || typeof name !== 'string') return true;
+        if (!name || typeof name !== "string") return true;
         const genericPatterns = [
           /^\d+$/, // Just numbers like "192"
           /Chrome.*on.*/, // Browser info like "Chrome on MacIntel"
@@ -699,28 +728,34 @@ io.on("connection", (socket) => {
           /^Computer$/, // Just "Computer"
           /^Unknown/, // Unknown devices
         ];
-        return genericPatterns.some(pattern => pattern.test(name)) || name.length < 3;
+        return (
+          genericPatterns.some((pattern) => pattern.test(name)) ||
+          name.length < 3
+        );
       };
-      
+
       // Try to find matching device by IP address from network scan
       if (cleanIP && isGenericName(deviceName)) {
-        const matchingDevice = devices.find(d => 
-          d.ip === cleanIP && !d.isWebsiteUser && !isGenericName(d.name)
+        const matchingDevice = devices.find(
+          (d) => d.ip === cleanIP && !d.isWebsiteUser && !isGenericName(d.name)
         );
         if (matchingDevice) {
           deviceName = matchingDevice.name;
           console.log(`Matched device by IP ${cleanIP}: ${deviceName}`);
         }
       }
-      
+
       // If still no good name, try to find any suitable device
       if (isGenericName(deviceName)) {
-        const matchingDevice = devices.find(d => 
-          d.status === 'online' && !d.isWebsiteUser && !isGenericName(d.name)
+        const matchingDevice = devices.find(
+          (d) =>
+            d.status === "online" && !d.isWebsiteUser && !isGenericName(d.name)
         );
-        deviceName = matchingDevice ? matchingDevice.name : `Web User ${users.length + 1}`;
+        deviceName = matchingDevice
+          ? matchingDevice.name
+          : `Web User ${users.length + 1}`;
       }
-      
+
       user = {
         id: userId,
         name: deviceName,
@@ -732,17 +767,25 @@ io.on("connection", (socket) => {
 
     // Helper function to check if a name is generic (reuse from above)
     const isGenericName = (name) => {
-      if (!name || typeof name !== 'string') return true;
+      if (!name || typeof name !== "string") return true;
       const genericPatterns = [
-        /^\d+$/, /Chrome.*on.*/, /Device-\d+/, /Web User \d+/,
-        /^[0-9.]+$/, /^Device$/, /^Computer$/, /^Unknown/
+        /^\d+$/,
+        /Chrome.*on.*/,
+        /Device-\d+/,
+        /Web User \d+/,
+        /^[0-9.]+$/,
+        /^Device$/,
+        /^Computer$/,
+        /^Unknown/,
       ];
-      return genericPatterns.some(pattern => pattern.test(name)) || name.length < 3;
+      return (
+        genericPatterns.some((pattern) => pattern.test(name)) || name.length < 3
+      );
     };
-    
+
     // Add the user to devices array - prevent duplicates by checking device ID only
     let existingDevice = devices.find((d) => d.id === `device-user-${user.id}`);
-    
+
     // Check if there's already a scanned device with this IP
     let scannedDevice = null;
     if (cleanIP) {
@@ -754,20 +797,22 @@ io.on("connection", (socket) => {
       if (scannedDevice) {
         scannedDevice.isWebsiteUser = true;
         scannedDevice.status = "online";
-        
+
         // Use the better name (prefer scanned device name if user name is generic)
         if (isGenericName(user.name) && !isGenericName(scannedDevice.name)) {
           user.name = scannedDevice.name; // Update user name too
-          const userIndex = users.findIndex(u => u.id === user.id);
+          const userIndex = users.findIndex((u) => u.id === user.id);
           if (userIndex !== -1) {
             users[userIndex].name = scannedDevice.name;
           }
         } else {
           scannedDevice.name = user.name; // Use user name if it's better
         }
-        
+
         io.emit("device-update", [scannedDevice]);
-        console.log(`Updated scanned device ${scannedDevice.name} as website user`);
+        console.log(
+          `Updated scanned device ${scannedDevice.name} as website user`
+        );
       } else {
         // Create new device entry
         const newDevice = {
@@ -788,31 +833,31 @@ io.on("connection", (socket) => {
       // Update existing device for reconnection
       existingDevice.status = "online";
       existingDevice.isWebsiteUser = true;
-      
+
       // Update name if we have a better one
       if (isGenericName(existingDevice.name) && !isGenericName(user.name)) {
         existingDevice.name = user.name;
       }
-      
+
       if (cleanIP) {
         existingDevice.ip = cleanIP;
-        
+
         // Check if we can now match with a scanned device
         if (scannedDevice && !isGenericName(scannedDevice.name)) {
           existingDevice.name = scannedDevice.name;
           existingDevice.mac = scannedDevice.mac;
           existingDevice.type = scannedDevice.type;
           existingDevice.isEthernet = scannedDevice.isEthernet;
-          
+
           // Update user name too
           user.name = scannedDevice.name;
-          const userIndex = users.findIndex(u => u.id === user.id);
+          const userIndex = users.findIndex((u) => u.id === user.id);
           if (userIndex !== -1) {
             users[userIndex].name = scannedDevice.name;
           }
         }
       }
-      
+
       io.emit("device-update", [existingDevice]);
       console.log(`Updated existing device ${existingDevice.name}`);
     }
@@ -881,9 +926,9 @@ function parseArpOutput(output) {
 
     if (os.platform() === "win32") {
       // Windows ARP output format:
-      // Interface: 192.168.1.173 --- 0x4
+      // Interface: 192.168.0.173 --- 0x4
       //   Internet Address      Physical Address      Type
-      //   192.168.1.173           00-1a-2b-3c-4d-5e     dynamic
+      //   192.168.0.173           00-1a-2b-3c-4d-5e     dynamic
       //   192.168.1.100         a4-83-e7-68-e2-30     dynamic
 
       // Skip header lines
@@ -913,8 +958,8 @@ function parseArpOutput(output) {
       }
     } else {
       // Unix/macOS ARP output format:
-      // Example: divines-mbp (192.168.1.173) at a4:83:e7:68:e2:30 on en0 ifscope permanent [ethernet]
-      // Example router: MyRouterSSID (192.168.1.173) at 00:1a:2b:3c:4d:5e on en0 ifscope [ethernet]
+      // Example: divines-mbp (192.168.0.173) at a4:83:e7:68:e2:30 on en0 ifscope permanent [ethernet]
+      // Example router: MyRouterSSID (192.168.0.173) at 00:1a:2b:3c:4d:5e on en0 ifscope [ethernet]
 
       const ethMatch = line.match(
         /^([\w\-]+(?:\.[\w\-]+)*) \(([0-9.]+)\) at ([0-9a-f:]+) on (\w+) ifscope(?: \w+)? \[ethernet\]/i
@@ -940,7 +985,7 @@ function parseArpOutput(output) {
 
       // Enhanced device name detection
       let detectedName = match.hostnameOrSSID;
-      
+
       // OS/Device detection (enhanced)
       const devicePatterns = {
         // Apple devices
@@ -948,7 +993,8 @@ function parseArpOutput(output) {
         ipad: /(ipad|iPad)/i,
         mac: /(macbook|mac|imac|Mac|MacBook|iMac)/i,
         // Android devices
-        android: /(android|pixel|galaxy|samsung|xiaomi|huawei|oneplus|lg-|htc|sony|motorola)/i,
+        android:
+          /(android|pixel|galaxy|samsung|xiaomi|huawei|oneplus|lg-|htc|sony|motorola)/i,
         // Windows devices
         windows: /(windows|surface|pc-|desktop-|laptop-)/i,
         // Linux devices
@@ -956,9 +1002,9 @@ function parseArpOutput(output) {
         // IoT/Smart devices
         iot: /(nest|echo|alexa|ring|philips|tp-link|netgear|linksys)/i,
         // Gaming consoles
-        gaming: /(xbox|playstation|nintendo|ps4|ps5)/i
+        gaming: /(xbox|playstation|nintendo|ps4|ps5)/i,
       };
-      
+
       // Check for device type patterns
       for (const [deviceType, pattern] of Object.entries(devicePatterns)) {
         if (pattern.test(match.hostnameOrSSID)) {
@@ -978,20 +1024,31 @@ function parseArpOutput(output) {
       } else {
         // Wireless device type detection based on MAC address OUI (first 3 octets)
         const macPrefix = match.mac.toLowerCase().substring(0, 8); // First 3 octets
-        
+
         // Common smartphone/tablet MAC prefixes
         const mobileMACs = [
-          'a8:96:75', 'ac:37:43', 'b8:e8:56', 'dc:a9:04', // Apple
-          '00:1a:11', '00:23:76', '00:26:bb', // Samsung
-          '00:15:00', '00:17:d5', '00:1b:98', // Google/Android
-          'f0:d1:a9', 'f4:0f:24', 'f8:a9:d0'  // Various mobile devices
+          "a8:96:75",
+          "ac:37:43",
+          "b8:e8:56",
+          "dc:a9:04", // Apple
+          "00:1a:11",
+          "00:23:76",
+          "00:26:bb", // Samsung
+          "00:15:00",
+          "00:17:d5",
+          "00:1b:98", // Google/Android
+          "f0:d1:a9",
+          "f4:0f:24",
+          "f8:a9:d0", // Various mobile devices
         ];
-        
-        if (mobileMACs.some(prefix => macPrefix.startsWith(prefix))) {
+
+        if (mobileMACs.some((prefix) => macPrefix.startsWith(prefix))) {
           type = "smartphone";
-        } else if (devicePatterns.iphone.test(match.hostnameOrSSID) || 
-                   devicePatterns.ipad.test(match.hostnameOrSSID) ||
-                   devicePatterns.android.test(match.hostnameOrSSID)) {
+        } else if (
+          devicePatterns.iphone.test(match.hostnameOrSSID) ||
+          devicePatterns.ipad.test(match.hostnameOrSSID) ||
+          devicePatterns.android.test(match.hostnameOrSSID)
+        ) {
           type = "smartphone";
         } else if (devicePatterns.gaming.test(match.hostnameOrSSID)) {
           type = "gaming";
@@ -1026,5 +1083,5 @@ const HOST = process.env.HOST || "0.0.0.0"; // Bind to all interfaces by default
 server.listen(PORT, HOST, () => {
   console.log(`Server running on ${HOST}:${PORT}`);
   console.log(`Platform: ${require("os").platform()}`);
-  console.log(`Access the application at: http://192.168.1.173:${PORT}`);
+  console.log(`Access the application at: http://192.168.0.173:${PORT}`);
 });
